@@ -138,10 +138,6 @@ class VoiceAIWorker(QThread):
 
     def set_target_language(self, lang: str):
         self.target_language = lang
-
-    def set_tts_model(self, model: str):
-        self.current_tts_model = model
-
     def run(self):
         if self.current_audio is None:
             return
@@ -149,13 +145,15 @@ class VoiceAIWorker(QThread):
         try:
             self.processing_started.emit()
 
-            # Transcribe audio (ASR returns text)
-            transcription = self.voice_processor.transcribe(self.current_audio)
+            # Transcribe audio with language detection
+            transcription_result = self.voice_processor.transcribe_with_language(self.current_audio)
+            transcription = transcription_result.text
+            detected_language = transcription_result.detected_language
+            
             self.transcription_ready.emit(transcription)
 
-            # Detected language is what the user spoke (ASR should detect, for now default to "en")
-            # This is separate from target_language which is what we want to output
-            detected_language = "en"  # ASR language detection would go here
+            # Log language detection info
+            self.logger.info(f"Detected language: {detected_language} (confidence: {transcription_result.confidence})")
 
             if self.is_dictation_mode:
                 # Dictation mode: translate if needed, then clean up via Wbind
@@ -220,13 +218,20 @@ class VoiceAIWorker(QThread):
                         )
 
                 self.response_ready.emit(response)
-                self.conversation_history.append(
-                    {"role": "user", "content": transcription}
-                )
-                self.conversation_history.append(
-                    {"role": "assistant", "content": response}
-                )
+                self.conversation_history.append({"role": "user", "content": transcription})
+                self.conversation_history.append({"role": "assistant", "content": response})
+                
+                # Speak response via TTS
+                self.tts_manager.speak(response)
 
+            self.processing_finished.emit()
+
+        except Exception as e:
+            self.error_occurred.emit(str(e))
+            self.processing_finished.emit()
+                self.conversation_history.append({"role": "user", "content": transcription})
+                self.conversation_history.append({"role": "assistant", "content": response})
+                
                 # Speak response via TTS
                 self.tts_manager.speak(response)
 

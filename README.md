@@ -4,7 +4,7 @@ A modern, sleek voice AI assistant built with PySide6 and Fluent UI widgets. Fea
 
 ## Features
 
-- **Canary-1b-v2 ASR** → **Groq openai/gpt-oss-120b** → **NeuTTS-Nano** pipeline
+- **Canary-1b-v2 ASR** → **Groq openai/gpt-oss-120b** → **Chatterbox FP16 / SopranoTTS** pipeline
 - **Two modes**: 
   - **Voice AI Assistant**: Conversational AI with context awareness
   - **Dictation Mode**: Clean transcription output for typing anywhere
@@ -20,7 +20,8 @@ A modern, sleek voice AI assistant built with PySide6 and Fluent UI widgets. Fea
 
 - Python 3.12
 - Canary-1b-v2 ASR model (in `models/canary1b/`)
-- NeuTTS-Nano TTS model (in `models/neutts-nano/`)
+- Chatterbox FP16 TTS model (in `models/chatterbox_fp16/`) 
+- SopranoTTS model (in `models/sopranotts/`)
 - Groq API key (configured in `settings.json`)
 - Tavily API key (configured in `settings.json`)
 
@@ -68,7 +69,8 @@ A modern, sleek voice AI assistant built with PySide6 and Fluent UI widgets. Fea
 
 The application expects the following model directories:
 - `models/canary1b/` - Contains Canary ASR model files
-- `models/neutts-nano/` - Contains NeuTTS-Nano TTS model files
+- `models/chatterbox_fp16/` - Contains Chatterbox FP16 TTS model files
+- `models/sopranotts/` - Contains SopranoTTS model files
 
 ## Web Search Logic
 

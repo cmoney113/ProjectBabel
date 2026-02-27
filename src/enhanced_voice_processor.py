@@ -1,6 +1,6 @@
 """
-Enhanced Voice Processor with Multi-Threading Recording
-Uses ASR FastAPI server for transcription
+Enhanced Voice Processor with Multi-Threading Recording and Language Detection
+Uses ASR FastAPI server for transcription with proper language detection
 """
 
 import numpy as np
@@ -12,7 +12,7 @@ import base64
 import io
 import soundfile as sf
 from pathlib import Path
-from typing import Optional, Callable, Any, List
+from typing import Optional, Callable, Any, List, Tuple
 import logging
 from dataclasses import dataclass
 from datetime import datetime
@@ -31,6 +31,14 @@ class AudioSegment:
     duration: float    # Duration in seconds
     segment_id: int
     is_primary: bool = True
+
+
+@dataclass
+class TranscriptionResult:
+    """Result from ASR transcription including detected language"""
+    text: str
+    detected_language: str
+    confidence: Optional[float] = None
 
 
 class RecordingWorker(threading.Thread):
@@ -327,14 +335,16 @@ class EnhancedVoiceProcessor:
             
             return combined_audio
     
-    def transcribe(self, audio_data: np.ndarray, target_language: str = None) -> str:
-        """Transcribe audio data using ASR FastAPI server
+    def transcribe_with_language(self, audio_data: np.ndarray, target_language: str = None) -> TranscriptionResult:
+        """
+        Transcribe audio data using ASR FastAPI server and return detected language
         
         Args:
             audio_data: Audio numpy array
             target_language: Target language for translation (if None, uses settings)
         
-        Note: For languages NOT supported by Qwen-TTS, translation is handled by LLM instead.
+        Returns:
+            TranscriptionResult with text, detected_language, and confidence
         """
         try:
             # Ensure audio is in correct format
@@ -356,16 +366,16 @@ class EnhancedVoiceProcessor:
             # Get source language from settings
             source_language = self.settings_manager.get("target_language", "en")
             
-            # Build request - ASR always transcribes in detected/source language
-            # LLM translation happens separately in main.py if needed
+            # Build request - ASR should detect language and return it
             request_json = {
                 "audio_data": audio_base64,
                 "model": self.current_asr_model,
                 "sample_rate": self.SAMPLE_RATE,
                 "language": source_language,
+                "detect_language": True,  # Request language detection
             }
             
-            # Call the FastAPI server (no translation - done by LLM)
+            # Call the FastAPI server with language detection enabled
             response = requests.post(
                 f"{ASR_SERVER_URL}/transcribe",
                 json=request_json,
@@ -376,20 +386,47 @@ class EnhancedVoiceProcessor:
                 result = response.json()
                 if result.get("success"):
                     text = result.get("text", "").strip()
+                    detected_language = result.get("detected_language", "en")
+                    confidence = result.get("confidence")
                     
-                    # If we didn't use ASR translation but target is set, 
-                    # we need LLM translation - this is handled in main.py
-                    return text
+                    self.logger.info(f"Transcribed '{text[:50]}...' in {detected_language} (confidence: {confidence})")
+                    
+                    return TranscriptionResult(
+                        text=text,
+                        detected_language=detected_language,
+                        confidence=confidence
+                    )
                 else:
-                    return f"[Transcription error: {result.get('error', 'Unknown error')}]"
+                    return TranscriptionResult(
+                        text=f"[Transcription error: {result.get('error', 'Unknown error')}]",
+                        detected_language="en",
+                        confidence=0.0
+                    )
             else:
-                return f"[Transcription error: HTTP {response.status_code}]"
+                return TranscriptionResult(
+                    text=f"[Transcription error: HTTP {response.status_code}]",
+                    detected_language="en", 
+                    confidence=0.0
+                )
                 
         except requests.exceptions.ConnectionError:
-            return "[ASR server not available. Is the server running?]"
+            return TranscriptionResult(
+                text="[ASR server not available. Is the server running?]",
+                detected_language="en",
+                confidence=0.0
+            )
         except Exception as e:
             self.logger.error(f"Transcription error: {e}")
-            return f"[Transcription error: {str(e)}]"
+            return TranscriptionResult(
+                text=f"[Transcription error: {str(e)}]",
+                detected_language="en",
+                confidence=0.0
+            )
+    
+    def transcribe(self, audio_data: np.ndarray, target_language: str = None) -> str:
+        """Transcribe audio data using ASR FastAPI server (legacy interface)"""
+        result = self.transcribe_with_language(audio_data, target_language)
+        return result.text
     
     def get_recording_state(self) -> dict:
         """Get current recording state information"""
