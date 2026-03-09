@@ -135,7 +135,8 @@ class EnhancedVoiceProcessor:
         # ASR models (same as before)
         self.available_asr_models = {
             "canary-1b-v2": "Canary 1B v2",
-            "parakeet-tdt-v3": "Parakeet TDT v3"
+            "parakeet-tdt-v3": "Parakeet TDT v3",
+            "sensevoice-small": "SenseVoice Small"
         }
         self.current_asr_model = settings_manager.get("asr_model", "canary-1b-v2")
         self.model = None

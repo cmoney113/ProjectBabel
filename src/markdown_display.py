@@ -23,20 +23,29 @@ class MarkdownDisplay(QTextEdit):
         """Setup the style for markdown rendering"""
         self.setStyleSheet("""
             QTextEdit {
-                background-color: #0d1117;
-                color: #c9d1d9;
-                border: none;
-                padding: 10px;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-                font-size: 14px;
-                line-height: 1.5;
+                background-color: #1a1f26;
+                color: #e6edf3;
+                border: 1px solid #30363d;
+                border-radius: 8px;
+                padding: 14px;
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+                font-size: 15px;
+                line-height: 1.6;
+                selection-background-color: #238636;
+                selection-color: #ffffff;
+            }
+            QTextEdit:hover {
+                border-color: #484f58;
+            }
+            QTextEdit:focus {
+                border-color: #58a6ff;
             }
         """)
-        
+
         # Set the palette for dark theme
         palette = self.palette()
-        palette.setColor(QPalette.ColorRole.Base, QColor("#0d1117"))
-        palette.setColor(QPalette.ColorRole.Text, QColor("#c9d1d9"))
+        palette.setColor(QPalette.ColorRole.Base, QColor("#1a1f26"))
+        palette.setColor(QPalette.ColorRole.Text, QColor("#e6edf3"))
         self.setPalette(palette)
     
     def setMarkdown(self, markdown_text: str):
@@ -162,27 +171,41 @@ class ScrollableMarkdownDisplay(QScrollArea):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        
+
         self.markdown_widget = MarkdownDisplay()
         self.setWidget(self.markdown_widget)
         self.setWidgetResizable(True)
         self.setStyleSheet("""
             QScrollArea {
-                background-color: #0d1117;
-                border: none;
+                background-color: #1a1f26;
+                border: 1px solid #30363d;
+                border-radius: 8px;
+            }
+            QScrollArea:hover {
+                border-color: #484f58;
             }
             QScrollBar:vertical {
-                background-color: #0d1117;
-                width: 10px;
-                border-radius: 5px;
+                background-color: #1a1f26;
+                width: 12px;
+                border-radius: 6px;
+                margin: 2px;
             }
             QScrollBar::handle:vertical {
                 background-color: #30363d;
-                border-radius: 5px;
+                border-radius: 6px;
                 min-height: 30px;
             }
             QScrollBar::handle:vertical:hover {
                 background-color: #484f58;
+            }
+            QScrollBar::handle:vertical:pressed {
+                background-color: #58a6ff;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
             }
         """)
     
@@ -197,3 +220,15 @@ class ScrollableMarkdownDisplay(QScrollArea):
     def clear(self):
         """Clear content"""
         self.markdown_widget.clear()
+
+    def toPlainText(self):
+        """Get plain text content"""
+        return self.markdown_widget.toPlainText()
+
+    def append(self, text: str):
+        """Append text (for compatibility with QTextEdit API)"""
+        self.markdown_widget.append_markdown(text)
+
+    def verticalScrollBar(self):
+        """Get vertical scroll bar"""
+        return super().verticalScrollBar()

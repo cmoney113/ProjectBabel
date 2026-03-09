@@ -5,9 +5,10 @@ model_cache/
 *.bin
 *.safetensors
 
-# Virtual environments
+# Virtual environments - explicit
+/venv/
+/env/
 venv/
-.venv/
 env/
 
 # Python
@@ -38,3 +39,12 @@ logs/
 settings.json
 *.key
 credentials.json
+
+# Test/Dev files
+test_*.py
+verify_*.py
+*.py.bak
+
+# Large untracked directories
+Fun-ASR-vllm/
+inference/

@@ -31,7 +31,8 @@ class VoiceProcessor:
         # Available ASR models
         self.available_asr_models = {
             "canary-1b-v2": "Canary 1B v2",
-            "parakeet-tdt-v3": "Parakeet TDT v3"
+            "parakeet-tdt-v3": "Parakeet TDT v3",
+            "sensevoice-small": "SenseVoice Small"
         }
         
         self.model = None
@@ -91,6 +92,21 @@ class VoiceProcessor:
                 self.model = LocalParakeetASR()
                 print(f"Parakeet TDT v3 ASR model loaded successfully on CPU")
                 return True
+            elif model_name == "sensevoice-small":
+                # Check if model files exist
+                model_dir = Path(__file__).parent.parent / "models" / "sensevoicesmall"
+                if not model_dir.exists():
+                    print(f"Warning: SenseVoiceSmall model directory not found at {model_dir}")
+                    print("Please ensure the model files are downloaded.")
+                    return False
+                    
+                # Import and load SenseVoiceSmall model
+                from models.sensevoicesmall.sensevoice_lean import SenseVoiceCTC
+                
+                # Force CPU for ASR models
+                self.model = SenseVoiceCTC(model_dir, provider="cpu")
+                print(f"SenseVoice Small ASR model loaded successfully on CPU")
+                return True
             else:
                 raise ValueError(f"Unknown ASR model: {model_name}")
                 
@@ -133,6 +149,25 @@ class VoiceProcessor:
                     text = result
                 else:
                     text = str(result)
+            elif self.current_asr_model == "sensevoice-small":
+                # SenseVoiceSmall supports multiple languages but no translation
+                # Use auto-detection or specified language
+                lang_map = {
+                    "en": "en",
+                    "es": "en",  # Map Spanish to English (not supported)
+                    "zh": "zh", 
+                    "ja": "ja",
+                    "ko": "ko",
+                    "yue": "yue",
+                    "auto": "auto",
+                }
+                language = self.settings_manager.get("target_language", "english")
+                sensevoice_lang = lang_map.get(language, "auto")
+                
+                # SenseVoiceSmall doesn't support translation, so ignore target_language
+                text = self.model.transcribe(
+                    audio_data, sample_rate=16000, language=sensevoice_lang, use_itn=True
+                )
             else:
                 text = ""
                 

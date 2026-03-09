@@ -35,6 +35,8 @@ current_model_name = None
 AVAILABLE_TTS_MODELS = {
     "chatterbox-fp16": "Chatterbox FP16 (Multilingual)",
     "sopranotts": "SopranoTTS",
+    "kittentts": "KittenTTS (Ultra-lightweight, 80M params)",
+    "vibevoice": "VibeVoice Realtime (~300ms, streaming)",
 }
 
 
@@ -89,6 +91,29 @@ def load_tts_model(model_name: str):
             logger.info("Qwen-TTS model loaded successfully")
             return True
 
+        elif model_name == "kittentts":
+            from src.tts_engines.kittentts_engine import KittenTTSEngine
+
+            model_dir = Path(__file__).parent.parent / "models" / "kittentts"
+            tts_model = KittenTTSEngine(
+                model_path=str(model_dir / "kitten_tts_mini_v0_8.onnx"),
+                voices_path=str(model_dir / "voices.npz"),
+            )
+            current_model_name = model_name
+            logger.info("KittenTTS model loaded successfully")
+            return True
+
+        elif model_name == "vibevoice":
+            from src.tts_engines.vibevoice_engine import VibeVoiceEngine
+
+            model_dir = Path(__file__).parent.parent / "models" / "VibeVoiceRealtime05b"
+            device = "cuda" if _check_cuda() else "cpu"
+            tts_model = VibeVoiceEngine(model_path=str(model_dir), device=device)
+            tts_model.load()
+            current_model_name = model_name
+            logger.info("VibeVoice model loaded successfully")
+            return True
+
         else:
             raise ValueError(f"Unknown TTS model: {model_name}")
 
@@ -121,11 +146,11 @@ def generate_speech_tts(text: str, model_name: str, **kwargs):
         return audio, 24000
 
     elif model_name == "chatterbox-fp16":
-        # Use language_id, not language
         language_id = kwargs.get("language_id", "en")
         exaggeration = kwargs.get("exaggeration", 0.3)
         cfg_weight = kwargs.get("cfg_weight", 0.1)
         temperature = kwargs.get("temperature", 0.8)
+        audio_prompt = kwargs.get("audio_prompt", None)
 
         audio = tts_model.generate(
             text,
@@ -133,6 +158,7 @@ def generate_speech_tts(text: str, model_name: str, **kwargs):
             exaggeration=exaggeration,
             cfg_weight=cfg_weight,
             temperature=temperature,
+            audio_prompt=audio_prompt,
         )
         return audio, 24000
 
@@ -164,6 +190,33 @@ def generate_speech_tts(text: str, model_name: str, **kwargs):
         )
         return waveform, sr
 
+    elif model_name == "kittentts":
+        voice = kwargs.get("voice", "Jasper")
+        speed = kwargs.get("speed", 1.0)
+        clean_text = kwargs.get("clean_text", True)
+
+        audio = tts_model.synthesize(
+            text, voice=voice, speed=speed, clean_text=clean_text
+        )
+        return audio, 24000
+
+    elif model_name == "vibevoice":
+        voice = kwargs.get("voice", "Carter")
+        cfg_scale = kwargs.get("cfg_scale", 1.5)
+        temperature = kwargs.get("temperature", 0.9)
+        top_p = kwargs.get("top_p", 0.9)
+        do_sample = kwargs.get("do_sample", False)
+
+        audio = tts_model.synthesize(
+            text,
+            voice=voice,
+            cfg_scale=cfg_scale,
+            temperature=temperature,
+            top_p=top_p,
+            do_sample=do_sample,
+        )
+        return audio, tts_model.sample_rate
+
     else:
         raise ValueError(f"Unknown model: {model_name}")
 
@@ -189,6 +242,9 @@ class SynthesizeRequest(BaseModel):
 
     text: str
     model: str = "sopranotts"
+    # Voice cloning / reference audio
+    reference_audio_base64: str | None = None
+    reference_audio_format: str | None = None
     # NeuTTS params
     voice_id: str = "default"
     speed: float = 1.0
@@ -205,6 +261,12 @@ class SynthesizeRequest(BaseModel):
     speaker: str = "Vivian"
     instruction: str | None = None
     non_streaming_mode: bool = True
+    # KittenTTS params
+    voice: str = "Jasper"
+    clean_text: bool = True
+    # VibeVoice params
+    cfg_scale: float = 1.5
+    do_sample: bool = False
 
 
 class SynthesizeResponse(BaseModel):
@@ -281,6 +343,16 @@ async def synthesize(request: SynthesizeRequest):
                 "cfg_weight": request.cfg_weight,
                 "temperature": request.temperature,
             }
+            # Handle voice cloning / reference audio
+            if request.reference_audio_base64:
+                try:
+                    ref_audio_bytes = base64.b64decode(request.reference_audio_base64)
+                    ref_buffer = io.BytesIO(ref_audio_bytes)
+                    ref_audio, ref_sr = sf.read(ref_buffer, dtype="float32")
+                    kwargs["audio_prompt"] = ref_audio
+                    logger.info(f"Loaded reference audio: {len(ref_audio)} samples")
+                except Exception as e:
+                    logger.warning(f"Failed to decode reference audio: {e}")
         elif request.model == "sopranotts":
             kwargs = {
                 "temperature": request.temperature,
@@ -294,15 +366,35 @@ async def synthesize(request: SynthesizeRequest):
                 "instruction": request.instruction,
                 "non_streaming_mode": request.non_streaming_mode,
             }
+        elif request.model == "kittentts":
+            kwargs = {
+                "voice": request.voice,
+                "speed": request.speed,
+                "clean_text": request.clean_text,
+            }
+        elif request.model == "vibevoice":
+            kwargs = {
+                "voice": request.voice,
+                "cfg_scale": request.cfg_scale,
+                "temperature": request.temperature,
+                "top_p": request.top_p,
+                "do_sample": request.do_sample,
+            }
 
         # Generate speech
+        logger.info(
+            f"Generating speech for model={request.model}, text='{request.text[:50]}...'"
+        )
         audio, sample_rate = generate_speech_tts(request.text, request.model, **kwargs)
+        logger.info(f"Generated audio: {len(audio)} samples, sample_rate={sample_rate}")
 
         # Convert to base64
         buffer = io.BytesIO()
         sf.write(buffer, audio, sample_rate, format="WAV")
         buffer.seek(0)
         audio_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+
+        logger.info(f"Encoded audio to base64: {len(audio_base64)} chars")
 
         return SynthesizeResponse(
             audio_base64=audio_base64,

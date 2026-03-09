@@ -28,6 +28,7 @@ import logging
 from typing import Optional, List, Dict, Any
 import asyncio
 import aiohttp
+from src.http_client import get_http_client
 
 logger = logging.getLogger(__name__)
 
@@ -66,10 +67,38 @@ class VoiceAIService:
     def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None):
         self.api_key = api_key
         self.base_url = base_url or "https://apis.iflow.cn/v1"
-        self.model = "qwen3-max"  # Quality model for conversation
+        self.model = "kimi-k2"  # Less restrictive content filters than qwen3-max
 
         # Fallback to direct API if iFlow not available
         self._use_direct_api = not HAS_IFLOW
+
+        # Profanity list for sanitization (only used when content filter triggers)
+        self.profanity_list = [
+            "fuck",
+            "fucking",
+            "fucked",
+            "fucker",
+            "shit",
+            "damn",
+            "goddamn",
+            "bitch",
+            "bastard",
+            "asshole",
+            "crap",
+            "piss",
+            "dick",
+            "cock",
+        ]
+
+    def _sanitize_text(self, text: str) -> str:
+        """Sanitize profanity from text - only called when content filter triggers"""
+        sanitized = text
+        for word in self.profanity_list:
+            # Case-insensitive replacement
+            sanitized = sanitized.replace(word, "[filtered]")
+            sanitized = sanitized.replace(word.capitalize(), "[filtered]")
+            sanitized = sanitized.replace(word.upper(), "[filtered]")
+        return sanitized
 
     async def _call_iflow(
         self, messages: List[Dict], temperature: float = 0.3
@@ -125,22 +154,23 @@ class VoiceAIService:
         }
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"{self.base_url}/chat/completions",
-                    json=payload,
-                    headers=headers,
-                    timeout=aiohttp.ClientTimeout(total=60),
-                ) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        return {
-                            "success": True,
-                            "content": data["choices"][0]["message"]["content"],
-                        }
-                    else:
-                        error = await resp.text()
-                        return {"success": False, "content": "", "error": error}
+            http_client = get_http_client()
+            session = await http_client.get_session()
+            async with session.post(
+                f"{self.base_url}/chat/completions",
+                json=payload,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=60),
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    return {
+                        "success": True,
+                        "content": data["choices"][0]["message"]["content"],
+                    }
+                else:
+                    error = await resp.text()
+                    return {"success": False, "content": "", "error": error}
         except Exception as e:
             return {"success": False, "content": "", "error": str(e)}
 
@@ -194,8 +224,32 @@ class VoiceAIService:
         if result["success"]:
             return result["content"]
         else:
-            logger.error(f"Voice AI error: {result.get('error')}")
-            return f"[AI Error: {result.get('error', 'Unknown')}]"
+            error_msg = result.get("error", "Unknown")
+            logger.error(f"Voice AI error: {error_msg}")
+
+            # Check for content filter errors - sanitize and retry
+            if (
+                "DataInspectionFailed" in error_msg
+                or "inappropriate content" in error_msg
+            ):
+                logger.warning("Content filter triggered, sanitizing and retrying...")
+                sanitized_input = self._sanitize_text(user_input)
+                logger.info(f"Sanitized input: {sanitized_input}")
+
+                # Replace user content with sanitized version
+                messages[-1]["content"] = sanitized_input
+
+                # Retry with sanitized text
+                result = await self._call_iflow(messages, temperature=temperature)
+
+                if result["success"]:
+                    return result["content"]
+                else:
+                    logger.error(
+                        f"Voice AI error after sanitization: {result.get('error')}"
+                    )
+
+            return f"[AI Error: {error_msg}]"
 
 
 # Singleton

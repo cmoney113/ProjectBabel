@@ -1,31 +1,57 @@
-# Canary Voice AI Assistant
+# Voice AI Assistant
 
-A modern, sleek voice AI assistant built with PySide6 and Fluent UI widgets. Features real-time speech transcription, conversational AI, and dictation capabilities.
+A modern, enterprise-grade voice AI assistant built with PySide6. Features real-time speech transcription, conversational AI, voice cloning, and GTT window automation integration.
 
 ## Features
 
-- **Canary-1b-v2 ASR** → **Groq openai/gpt-oss-120b** → **Chatterbox FP16 / SopranoTTS** pipeline
-- **Two modes**: 
+### Core Voice AI
+- **ASR → LLM → TTS Pipeline**: Canary-1b-v2 ASR → Groq LLM → VibeVoice/Chatterbox FP16/SopranoTTS
+- **Two modes**:
   - **Voice AI Assistant**: Conversational AI with context awareness
-  - **Dictation Mode**: Clean transcription output for typing anywhere
+  - **Dictation Mode**: Clean transcription for typing anywhere
 - **Trigger options**:
   - **Auto VAD**: Automatic processing when silence is detected
-  - **Manual**: Press configurable hotkey (Ctrl+Space by default) to activate
-- **Web Search Integration**: Uses Tavily API for current events and comprehensive information
-- **Context-aware**: Maintains conversation history for coherent responses
-- **Modern UI**: Dark navy theme with Fluent UI animations and transitions
-- **Real-time Display**: Shows both user speech and AI response
+  - **Manual**: Press configurable hotkey (Ctrl+Space by default)
+
+### URL to TTS
+- Paste any URL and have it read aloud
+- Uses archive.is + readability to extract article content
+- Automatically fetches and converts web articles to speech
+
+### Search to TTS
+- Search the web using Tavily API
+- Select from search results
+- Selected article is extracted and read aloud
+
+### Voice Cloning
+- **VibeVoice**: Import custom `.pt` voice preset files
+- **Chatterbox FP16**: Use reference audio (WAV/MP3) to clone voice
+- Manage custom voices in the Voice Cloning tab
+
+### GTT Automation (GreaterTouchTool)
+- Window automation integration via GTT CLI
+- Automatically type transcribed text anywhere
+- Window focus, move, resize operations
+- Hotkey scripting and automation
 
 ## Requirements
 
-- Python 3.12
-- Canary-1b-v2 ASR model (in `models/canary1b/`)
-- Chatterbox FP16 TTS model (in `models/chatterbox_fp16/`) 
-- SopranoTTS model (in `models/sopranotts/`)
-- Groq API key (configured in `settings.json`)
-- Tavily API key (configured in `settings.json`)
+- Python 3.12+
+- API Keys (configured in `settings.json`):
+  - **Groq API key**: For LLM inference
+  - **Tavily API key**: For web search
 
-## Setup
+### Models
+
+The application dynamically discovers models from the server files:
+- **TTS Models**: VibeVoice, Chatterbox FP16, SopranoTTS, Qwen-TTS, KittensTTS
+- **ASR Models**: Canary-1b-v2, Parakeet TDT, SenseVoice Small
+
+Model files should be placed in:
+- `models/` directory (for TTS models)
+- Check individual model requirements for file structure
+
+## Installation
 
 1. **Create virtual environment**:
    ```bash
@@ -39,8 +65,12 @@ A modern, sleek voice AI assistant built with PySide6 and Fluent UI widgets. Fea
    ```
 
 3. **Configure API keys** in `settings.json`:
-   - `groq_api_key`: Your Groq API key
-   - `tavily_api_key`: Your Tavily API key (default dev key included)
+   ```json
+   {
+     "groq_api_key": "your-groq-api-key",
+     "tavily_api_key": "your-tavily-api-key"
+   }
+   ```
 
 4. **Run the application**:
    ```bash
@@ -51,35 +81,120 @@ A modern, sleek voice AI assistant built with PySide6 and Fluent UI widgets. Fea
 
 ### Voice AI Mode (Default)
 - Toggle **Auto VAD Trigger** for hands-free operation
-- Or press **Ctrl+Space** to manually start listening
-- Speak naturally, the AI will respond when you pause
-- Responses are displayed and spoken via TTS
+- Press **Ctrl+Space** to manually start/stop listening
+- Speak naturally; AI responds when you pause
+- Responses displayed and spoken via TTS
 
 ### Dictation Mode
 - Toggle **Dictation Mode** on
-- Your speech will be processed with post-processing rules
-- Output is automatically typed wherever your cursor is located (via `gtt` command)
+- Speech is processed and typed where cursor is located
+- Uses GTT for automatic text insertion
 
-### Configuration
-- **Hotkey**: Edit the manual hotkey in the settings
-- **VAD Sensitivity**: Adjust `silence_timeout_ms` in `settings.json`
-- **Profiles**: Use different profiles for email, code, chat, or documentation
+### URL to TTS
+1. Go to **URL to TTS** tab
+2. Paste any URL (article, news, blog)
+3. Click **Fetch & Speak** or press Enter
+4. Article is extracted and read aloud
 
-## Models
+### Search to TTS
+1. Go to **Search to TTS** tab
+2. Enter your search query
+3. Click **Search** or press Enter
+4. Browse results, click **Speak** on any result
+5. Article is extracted and read aloud
 
-The application expects the following model directories:
-- `models/canary1b/` - Contains Canary ASR model files
-- `models/chatterbox_fp16/` - Contains Chatterbox FP16 TTS model files
-- `models/sopranotts/` - Contains SopranoTTS model files
+### Voice Cloning
 
-## Web Search Logic
+#### VibeVoice Voice Cloning
+1. Go to **Voice Cloning** tab
+2. Select **VibeVoice** as the TTS model
+3. Click **Import Voice File** to add custom `.pt` voice files
+4. Select a voice from the dropdown
+5. Use in Voice AI or URL to TTS modes
 
-The assistant automatically performs web searches when:
-- Query contains current events keywords (today, news, latest, etc.)
-- Query asks for comprehensive/detailed information
-- Query requires up-to-date information beyond common knowledge
-- Model confidence is below 0.85 threshold
+#### Chatterbox FP16 Voice Cloning
+1. Go to **Voice Cloning** tab
+2. Select **Chatterbox FP16** as the TTS model
+3. Click **Browse** to select reference audio (WAV/MP3)
+4. Click **Generate Voice** to create cloned voice
+5. Use reference audio in Voice AI mode
+
+### GTT Automation
+1. Go to **GTT Automation** tab
+2. Configure automation commands
+3. Enable "Type with GTT" in settings for dictation
+4. Dictated text automatically typed in active window
+
+## Configuration
+
+Settings are stored in `settings.json`:
+- **Hotkey**: Manual trigger key (default: Ctrl+Space)
+- **VAD Sensitivity**: `silence_timeout_ms` (default: 1500ms)
+- **TTS Model**: Default TTS engine
+- **ASR Model**: Default ASR engine
+- **LLM Model**: Default LLM model
+- **GTT Enabled**: Enable GTT integration for dictation
+
+## Architecture
+
+```
+voice_ai/
+├── src/
+│   ├── main.py                 # Application entry point
+│   ├── tts_manager.py          # TTS orchestration
+│   ├── asr_manager.py          # ASR orchestration
+│   ├── llm_manager.py          # LLM integration
+│   ├── model_registry.py       # Dynamic model discovery
+│   ├── url_processor.py       # URL → TTS pipeline
+│   ├── search_processor.py    # Search → TTS pipeline
+│   ├── tts_engines/            # TTS engine implementations
+│   │   ├── vibevoice_engine.py
+│   │   └── ...
+│   └── ui/
+│       ├── main_window.py      # Main application window
+│       └── pages/              # Tab pages
+│           ├── voice_ai_page.py
+│           ├── url_tts_page.py
+│           ├── search_tts_page.py
+│           ├── voice_cloning_page.py
+│           ├── gtt_page.py
+│           └── settings_page.py
+├── servers/
+│   ├── tts_server.py           # TTS HTTP server
+│   ├── asr_server.py           # ASR HTTP server
+│   └── llm_server.py           # LLM HTTP server
+├── inference/                  # Model inference code
+│   ├── vibevoice/
+│   ├── chatterbox_fp16/
+│   └── ...
+└── models/                     # Model files
+```
+
+## API Keys
+
+### Groq
+Get your API key from: https://console.groq.com/keys
+
+### Tavily
+Get your API key from: https://tavily.com/api/
+
+## Troubleshooting
+
+### TTS Server Issues
+- Ensure all model files are in place
+- Check port 8001 is available
+- Review server logs for errors
+
+### ASR Not Detecting Speech
+- Check microphone permissions
+- Adjust VAD sensitivity in settings
+- Verify audio device is selected
+
+### GTT Not Typing
+- Ensure GTT is installed and in PATH
+- Check GTT daemon is running
+- Verify window focus is correct
 
 ## License
 
-This project is for educational and demonstration purposes. Replace mock implementations with actual model inference code for production use.
+This project is for enterprise demonstration purposes.

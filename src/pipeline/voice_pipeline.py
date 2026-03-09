@@ -1,11 +1,11 @@
 """
 Voice Pipeline Orchestrator
 ==========================
-Unified pipeline: ASR → Translation → Voice AI/Dictation → TTS
+Unified pipeline: ASR → Groq Post-Process → Translation → Voice AI/Dictation → TTS
 
 Flow:
-    [Audio] → [ASR] → [Translate? via Groq] → [Voice AI via iFlow] → [TTS] → [Output]
-    [Audio] → [ASR] → [Translate? via Groq] → [Dictation via iFlow] → [Wbind] → [Typed Output]
+    [Audio] → [ASR] → [Groq Post-Process] → [Translate? via Groq] → [Voice AI via iFlow] → [TTS] → [Output]
+    [Audio] → [ASR] → [Groq Post-Process] → [Translate? via Groq] → [Dictation via iFlow] → [Wbind] → [Typed Output]
 """
 
 import logging
@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 from ..llm import translate_text, process_voice_prompt
 from ..languages import get_tts_languages
+from ..llm_manager import LLMManager
 
 logger = logging.getLogger(__name__)
 
@@ -35,12 +36,14 @@ class VoicePipeline:
     """
     Unified voice pipeline orchestrator.
 
-    Coordinates: ASR → Translation → Voice AI/Dictation → TTS/Wbind
+    Coordinates: ASR → Groq Post-Process → Translation → Voice AI/Dictation → TTS/Wbind
     """
 
     def __init__(self, settings_manager):
         self.settings = settings_manager
         self.conversation_history: List[Dict] = []
+        # Initialize Groq LLM manager for post-processing
+        self.llm_manager = LLMManager(settings_manager)
 
     def reset_conversation(self):
         """Clear conversation history for new chat"""
@@ -56,7 +59,7 @@ class VoicePipeline:
     ) -> PipelineResult:
         """
         Full Voice AI pipeline:
-        ASR output → Translate if needed → Voice AI → TTS
+        ASR output → Groq Post-Process → Translate if needed → Voice AI → TTS
 
         Returns text to be spoken by TTS
         """
@@ -64,15 +67,20 @@ class VoicePipeline:
             if not target_language:
                 target_language = detected_language
 
+            # Step 1: Groq post-processing to clean up ASR transcription
+            cleaned_text = self.llm_manager.process_dictation(audio_data)
+
+            # Step 2: Translate if needed
             if detected_language != target_language:
                 translated = await translate_text(
-                    audio_data,  # This is actually text from ASR
+                    cleaned_text,
                     source_lang=detected_language,
                     target_lang=target_language,
                 )
             else:
-                translated = audio_data
+                translated = cleaned_text
 
+            # Step 3: Voice AI processing via iFlow
             processed = await process_voice_prompt(
                 user_input=translated,
                 conversation_history=self.conversation_history,
@@ -116,7 +124,7 @@ class VoicePipeline:
     ) -> PipelineResult:
         """
         Dictation pipeline:
-        ASR output → Translate if needed → Dictation (clean up) → Wbind
+        ASR output → Groq Post-Process → Translate if needed → Dictation (clean up) → Wbind
 
         Returns text to be typed via Wbind
         """
@@ -124,15 +132,20 @@ class VoicePipeline:
             if not target_language:
                 target_language = detected_language
 
+            # Step 1: Groq post-processing to clean up ASR transcription
+            cleaned_text = self.llm_manager.process_dictation(audio_data)
+
+            # Step 2: Translate if needed
             if detected_language != target_language:
                 translated = await translate_text(
-                    audio_data,
+                    cleaned_text,
                     source_lang=detected_language,
                     target_lang=target_language,
                 )
             else:
-                translated = audio_data
+                translated = cleaned_text
 
+            # Step 3: iFlow dictation processing (additional cleanup/formatting)
             processed = await process_voice_prompt(
                 user_input=translated,
                 conversation_history=[],  # No history for dictation
