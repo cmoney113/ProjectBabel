@@ -43,7 +43,7 @@ class SettingsManager:
             "enable_llm": True,
             "paste_output": False,
             "min_words_for_llm": 7,
-            "typing_mode": "wbind",
+            "typing_mode": "grus",
             "target_language": "english",
             "tts_streaming": False,
             # Auto-save TTS outputs

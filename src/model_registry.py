@@ -1,178 +1,422 @@
 """
 Dynamic Model Registry for Voice AI
-Automatically discovers and registers available ASR and TTS models
-Source of truth: servers/tts_server.py and servers/asr_server.py
+Single source of truth for all model information
+Used by: TTS Server, ASR Server, GUI Components, Voice Cloning
+
+Adding a new model = update ONE file
 """
 
-from pathlib import Path
-from typing import Dict, List, Any, Optional
-from dataclasses import dataclass, asdict
-
-# TTS Models from tts_server.py
-TTS_MODELS = [
-    {"id": "chatterbox-fp16", "name": "Chatterbox FP16", "type": "tts"},
-    {"id": "sopranotts", "name": "SopranoTTS", "type": "tts"},
-    {"id": "qwen-tts", "name": "Qwen-TTS", "type": "tts"},
-    {"id": "kittentts", "name": "KittenTTS", "type": "tts"},
-    {"id": "vibevoice", "name": "VibeVoice Realtime", "type": "tts", "streaming": True, "voice_cloning": True, "languages": ["en", "es", "fr", "de", "it", "pt", "ja", "ko", "zh"]},
-]
-
-# ASR Models from asr_server.py
-ASR_MODELS = [
-    {"id": "canary-1b-v2", "name": "Canary 1B v2", "type": "asr"},
-    {"id": "parakeet-tdt-v3", "name": "Parakeet TDT v3", "type": "asr"},
-    {"id": "sensevoice-small", "name": "SenseVoice Small", "type": "asr"},
-]
+from typing import Dict, List, Any, Optional, Tuple
+from dataclasses import dataclass, field
 
 
 @dataclass
-class ModelConfig:
-    """Configuration for a model with its settings"""
+class ModelInfo:
+    """Complete model metadata"""
 
-    id: str
-    name: str
-    type: str  # 'tts' or 'asr'
+    id: str  # Internal ID (e.g., "vibevoice")
+    name: str  # Display name (e.g., "VibeVoice")
+    display_name: str  # Full display name (e.g., "VibeVoice (Streaming)")
+    type: str  # "tts" or "asr"
+
+    # Language support
+    languages: List[str] = field(default_factory=list)  # ["en", "es", "zh"]
+    is_multilingual: bool = False
+    language_options: Dict[str, str] = field(
+        default_factory=dict
+    )  # {"en": "English", "es": "Spanish"}
+
+    # Voice cloning support
+    voice_cloning_type: Optional[str] = None
+    voice_cloning_languages: List[str] = field(default_factory=list)
+    reference_phrases: Dict[str, str] = field(default_factory=dict)
+
+    # Streaming support
     streaming: bool = False
-    default_settings: Optional[Dict[str, Any]] = None
-    voice_options: Optional[List[str]] = None
-    language_options: Optional[List[str]] = None
 
-    def __post_init__(self):
-        if self.default_settings is None:
-            self.default_settings = {}
-        if self.voice_options is None:
-            self.voice_options = []
-        if self.language_options is None:
-            self.language_options = []
+    # Performance
+    latency: Optional[str] = None  # "~300ms", "fast", "slow"
+
+    # Model-specific settings
+    voice_options: List[str] = field(default_factory=list)
+    default_voice: Optional[str] = None
+    default_settings: Dict[str, Any] = field(default_factory=dict)
+
+    # UI hints
+    description: Optional[str] = None
+    instructions: Optional[str] = None  # Usage notes (e.g., voice cloning instructions)
+    icon: Optional[str] = None
 
 
 class ModelRegistry:
-    """Dynamic registry that manages available models and their configurations"""
+    """
+    Single source of truth for all TTS/ASR models.
 
-    def __init__(self):
-        self.models = {}
-        self._initialize_models()
+    Usage:
+        # Get all TTS models for dropdown
+        for model in ModelRegistry.get_tts_models():
+            combo.addItem(model.display_name, model.id)
 
-    def _initialize_models(self):
-        """Initialize all available models with their configurations"""
-        # TTS Models
-        for model_info in TTS_MODELS:
-            model_id = model_info["id"]
-            config = ModelConfig(
-                id=model_id,
-                name=model_info["name"],
-                type="tts",
-                streaming=model_info.get("streaming", False),
-            )
+        # Get only voice cloning models
+        for model in ModelRegistry.get_voice_cloning_models():
+            combo.addItem(model.display_name, model.id)
 
-            # Add model-specific settings
-            if model_id == "vibevoice":
-                config.voice_options = [
-                    "Carter",
-                    "Emma",
-                    "Fable",
-                    "Onyx",
-                    "Nova",
-                    "Shimmer",
-                ]
-                config.language_options = [
-                    "en",
-                    "es",
-                    "fr",
-                    "de",
-                    "it",
-                    "pt",
-                    "ja",
-                    "ko",
-                    "zh",
-                ]
-                config.default_settings = {
-                    "voice": "Carter",
-                    "language": "en",
-                    "temperature": 0.9,
-                    "top_p": 0.9,
-                    "cfg_scale": 1.5,
-                    "do_sample": False,
-                    "streaming": True,
-                }
-            elif model_id == "kittentts":
-                config.voice_options = ["default"]
-                config.default_settings = {
-                    "voice": "default",
-                    "speed": 1.0,
-                    "clean_text": True,
-                }
-            elif model_id == "qwen-tts":
-                config.voice_options = ["Vivian", "Alex", "Emma", "Liam", "Olivia"]
-                config.language_options = ["Chinese", "English", "Japanese", "Korean"]
-                config.default_settings = {
-                    "speaker": "Vivian",
-                    "language": "Chinese",
-                    "instruction": None,
-                    "non_streaming_mode": True,
-                }
-            elif model_id == "sopranotts":
-                config.default_settings = {
-                    "temperature": 0.3,
-                    "top_p": 0.95,
-                    "repetition_penalty": 1.2,
-                }
-            elif model_id == "chatterbox-fp16":
-                config.default_settings = {"cfg_weight": 0.1, "temperature": 0.8}
+        # Get model config
+        model = ModelRegistry.get_model("vibevoice")
+        if model.voice_cloning_type == "presets":
+            # show preset selection
+    """
 
-            self.models[model_id] = config
+    # =========================================================================
+    # TTS MODELS - Single source of truth
+    # =========================================================================
+    TTS_MODELS: Dict[str, ModelInfo] = {
+        "vibevoice": ModelInfo(
+            id="vibevoice",
+            name="VibeVoice",
+            display_name="VibeVoice (Streaming)",
+            type="tts",
+            languages=["en", "es", "fr", "de", "it", "pt", "ja", "ko", "zh"],
+            is_multilingual=True,
+            voice_cloning_type="presets",  # Uses .pt preset files
+            voice_cloning_languages=[
+                "en",
+                "es",
+                "fr",
+                "de",
+                "it",
+                "pt",
+                "ja",
+                "ko",
+                "zh",
+            ],
+            reference_phrases={
+                "en": "The quick brown fox jumps over the lazy dog. In the garden, beautiful flowers bloom under the golden sunlight.",
+                "es": "El veloz murciélago hindú comía feliz cardillo y kiwi. La cigüeña tocaba el saxofón detrás del palenque de paja.",
+                "fr": "Le renard brun rapide saute par-dessus le chien paresseux. Dans le jardin, de belles fleurs s'épanouissent sous le soleil doré.",
+                "de": "Der schnelle braune Fuchs springt über den faulen Hund. Im Garten blühen schöne Blumen unter dem goldenen Sonnenlicht.",
+                "it": "La rapida volpe marrone salta sopra il cane pigro. Nel giardino, belle fiori sbocciano sotto la luce dorata del sole.",
+                "pt": "A rápida raposa marrom salta sobre o cão preguiçoso. No jardim, belas flores desabrocham sob a luz dourada do sol.",
+                "ja": "素早い茶色の狐は怠け者の犬を飛び越えます。庭では、美しい花が金色の日光の下で咲いています。",
+                "ko": "빠른 갈색 여우가 게으른 개를 뛰어넘습니다. 정원에서는 아름다운 꽃들이 황금빛 햇살 아래에서 피어납니다.",
+                "zh": "敏捷的棕色狐狸跳过懒惰的狗。在花园里，美丽的花朵在金色的阳光下绽放。",
+            },
+            streaming=True,
+            latency="~300ms",
+            voice_options=["Carter", "Emma", "Fable", "Onyx", "Nova", "Shimmer"],
+            default_voice="Carter",
+            default_settings={
+                "voice": "Carter",
+                "language": "en",
+                "temperature": 0.9,
+                "top_p": 0.9,
+                "cfg_scale": 1.5,
+                "do_sample": False,
+                "streaming": True,
+            },
+            description="Ultra-low latency streaming TTS with voice presets",
+            instructions="Voice cloning: Import .pt preset files in Voice Cloning tab. Supports Carter, Emma, Fable, Onyx, Nova, Shimmer voices. Record reference audio in any of 9 languages.",
+        ),
+        "kanitts": ModelInfo(
+            id="kanitts",
+            name="KaniTTS",
+            display_name="KaniTTS (English)",
+            type="tts",
+            languages=["en"],
+            is_multilingual=False,
+            voice_cloning_type=None,
+            streaming=False,
+            latency="fast",
+            default_settings={
+                "speed": 1.0,
+                "temperature": 0.6,
+            },
+            description="High-quality English-only TTS model",
+        ),
+        "chatterbox-fp16": ModelInfo(
+            id="chatterbox-fp16",
+            name="Chatterbox FP16",
+            display_name="Chatterbox FP16 (Voice Cloning)",
+            type="tts",
+            languages=["en"],
+            is_multilingual=False,
+            voice_cloning_type="reference",  # Uses WAV/MP3 reference audio
+            voice_cloning_languages=["en"],
+            reference_phrases={
+                "en": "The quick brown fox jumps over the lazy dog. In the garden, beautiful flowers bloom under the golden sunlight."
+            },
+            streaming=False,
+            latency="medium",
+            default_settings={
+                "cfg_weight": 0.1,
+                "temperature": 0.8,
+            },
+            description="Voice cloning with reference audio (WAV/MP3)",
+            instructions="Voice cloning: Provide a reference WAV/MP3 audio file. The model will clone the voice from the reference audio. Record reference audio for best results.",
+        ),
+        "qwen-tts": ModelInfo(
+            id="qwen-tts",
+            name="Qwen-TTS",
+            display_name="Qwen-TTS",
+            type="tts",
+            languages=["zh", "en", "ja", "ko"],
+            is_multilingual=True,
+            voice_cloning_type=None,
+            streaming=False,
+            latency="medium",
+            voice_options=["Vivian", "Alex", "Emma", "Liam", "Olivia"],
+            default_voice="Vivian",
+            default_settings={
+                "speaker": "Vivian",
+                "language": "Chinese",
+                "instruction": None,
+                "non_streaming_mode": True,
+            },
+            description="Multi-language TTS from Qwen",
+        ),
+        "sopranotts": ModelInfo(
+            id="sopranotts",
+            name="SopranoTTS",
+            display_name="SopranoTTS",
+            type="tts",
+            languages=["en"],
+            is_multilingual=False,
+            voice_cloning_type=None,
+            streaming=False,
+            latency="medium",
+            default_settings={
+                "temperature": 0.3,
+                "top_p": 0.95,
+                "repetition_penalty": 1.2,
+            },
+            description="High-quality English TTS",
+        ),
+        "kittentts": ModelInfo(
+            id="kittentts",
+            name="KittenTTS",
+            display_name="KittenTTS",
+            type="tts",
+            languages=["en"],
+            is_multilingual=False,
+            voice_cloning_type=None,
+            streaming=False,
+            latency="fast",
+            voice_options=["default"],
+            default_voice="default",
+            default_settings={
+                "voice": "default",
+                "speed": 1.0,
+                "clean_text": True,
+            },
+            description="Fast English TTS for quick generation",
+        ),
+    }
 
-        # ASR Models
-        for model_info in ASR_MODELS:
-            model_id = model_info["id"]
-            config = ModelConfig(id=model_id, name=model_info["name"], type="asr")
-            self.models[model_id] = config
+    # =========================================================================
+    # ASR MODELS - Single source of truth
+    # =========================================================================
+    ASR_MODELS: Dict[str, ModelInfo] = {
+        "canary-1b-v2": ModelInfo(
+            id="canary-1b-v2",
+            name="Canary 1B v2",
+            display_name="Canary 1B v2",
+            type="asr",
+            languages=["en", "de", "es", "fr"],
+            is_multilingual=True,
+            default_settings={},
+            description="High-accuracy multilingual ASR",
+        ),
+        "parakeet-tdt-v3": ModelInfo(
+            id="parakeet-tdt-v3",
+            name="Parakeet TDT v3",
+            display_name="Parakeet TDT v3",
+            type="asr",
+            languages=["en"],
+            is_multilingual=False,
+            default_settings={},
+            description="Fast English ASR model",
+        ),
+        "sensevoice-small": ModelInfo(
+            id="sensevoice-small",
+            name="SenseVoice Small",
+            display_name="SenseVoice Small",
+            type="asr",
+            languages=["en", "zh", "yue", "ja", "ko"],
+            is_multilingual=True,
+            default_settings={},
+            description="Efficient multilingual ASR",
+        ),
+    }
 
-    def get_tts_models(self) -> List[ModelConfig]:
-        """Get all available TTS models"""
-        return [model for model in self.models.values() if model.type == "tts"]
+    # =========================================================================
+    # CLASS METHODS - For GUI and API usage
+    # =========================================================================
 
-    def get_asr_models(self) -> List[ModelConfig]:
-        """Get all available ASR models"""
-        return [model for model in self.models.values() if model.type == "asr"]
+    @classmethod
+    def get_tts_models(
+        cls,
+        filter_language: Optional[str] = None,
+        filter_voice_cloning: Optional[str] = None,
+        filter_streaming: Optional[bool] = None,
+    ) -> List["ModelInfo"]:
+        """
+        Get TTS models with optional filters.
 
-    def get_model(self, model_id: str) -> Optional[ModelConfig]:
-        """Get a specific model by ID"""
-        return self.models.get(model_id)
+        Args:
+            filter_language: Filter by language (e.g., "en")
+            filter_voice_cloning: "presets" or "reference" to filter by cloning type
+            filter_streaming: True/False to filter by streaming support
 
-    def get_model_names(self, model_type: str = "tts") -> List[str]:
-        """Get model names for dropdowns"""
+        Returns:
+            List of ModelInfo objects
+        """
+        models = list(cls.TTS_MODELS.values())
+
+        if filter_language:
+            models = [m for m in models if filter_language in m.languages]
+
+        if filter_voice_cloning:
+            models = [m for m in models if m.voice_cloning_type == filter_voice_cloning]
+
+        if filter_streaming is not None:
+            models = [m for m in models if m.streaming == filter_streaming]
+
+        return models
+
+    @classmethod
+    def get_asr_models(cls, filter_language: Optional[str] = None) -> List["ModelInfo"]:
+        """Get ASR models with optional language filter."""
+        models = list(cls.ASR_MODELS.values())
+
+        if filter_language:
+            models = [m for m in models if filter_language in m.languages]
+
+        return models
+
+    @classmethod
+    def get_voice_cloning_models(cls) -> List[ModelInfo]:
+        """Get all models that support voice cloning."""
+        return [m for m in cls.TTS_MODELS.values() if m.voice_cloning_type is not None]
+
+    @classmethod
+    def get_streaming_models(cls) -> List[ModelInfo]:
+        """Get all streaming TTS models."""
+        return [m for m in cls.TTS_MODELS.values() if m.streaming]
+
+    @classmethod
+    def get_model(cls, model_id: str) -> Optional[ModelInfo]:
+        """Get a specific model by ID (checks both TTS and ASR)."""
+        return cls.TTS_MODELS.get(model_id) or cls.ASR_MODELS.get(model_id)
+
+    @classmethod
+    def get_model_ids(cls, model_type: str = "tts") -> List[str]:
+        """Get all model IDs for a given type."""
         if model_type == "tts":
-            return [model.name for model in self.get_tts_models()]
-        return [model.name for model in self.get_asr_models()]
+            return list(cls.TTS_MODELS.keys())
+        return list(cls.ASR_MODELS.keys())
 
-    def get_model_ids(self, model_type: str = "tts") -> List[str]:
-        """Get model IDs for internal use"""
+    @classmethod
+    def get_display_names(cls, model_type: str = "tts") -> List[Tuple[str, str]]:
+        """Get all display names for a given type. Returns list of (id, display_name) tuples."""
         if model_type == "tts":
-            return [model.id for model in self.get_tts_models()]
-        return [model.id for model in self.get_asr_models()]
+            return [(m.id, m.display_name) for m in cls.TTS_MODELS.values()]
+        return [(m.id, m.display_name) for m in cls.ASR_MODELS.values()]
 
-    def get_default_settings(self, model_id: str) -> Dict[str, Any]:
-        """Get default settings for a model"""
-        model = self.get_model(model_id)
-        if model and model.default_settings:
+    @classmethod
+    def get_default_settings(cls, model_id: str) -> Dict[str, Any]:
+        """Get default settings for a model."""
+        model = cls.get_model(model_id)
+        if model:
             return dict(model.default_settings)
         return {}
 
-    def get_voice_options(self, model_id: str) -> List[str]:
-        """Get voice options for a model"""
-        model = self.get_model(model_id)
-        if model and model.voice_options:
+    @classmethod
+    def get_voice_options(cls, model_id: str) -> List[str]:
+        """Get voice options for a model."""
+        model = cls.get_model(model_id)
+        if model:
             return list(model.voice_options)
         return []
 
-    def get_language_options(self, model_id: str) -> List[str]:
-        """Get language options for a model"""
-        model = self.get_model(model_id)
-        if model and model.language_options:
-            return list(model.language_options)
-        return []
+    @classmethod
+    def supports_voice_cloning(cls, model_id: str) -> bool:
+        """Check if a model supports voice cloning."""
+        model = cls.get_model(model_id)
+        return model.voice_cloning_type is not None if model else False
+
+    @classmethod
+    def get_voice_cloning_type(cls, model_id: str) -> Optional[str]:
+        """Get the voice cloning type for a model (presets/reference/None)."""
+        model = cls.get_model(model_id)
+        return model.voice_cloning_type if model else None
+
+    @classmethod
+    def get_asr_languages(cls) -> Dict[str, str]:
+        """Get all available ASR languages (code -> name mapping)."""
+        return {
+            "en": "English",
+            "es": "Spanish",
+            "fr": "French",
+            "de": "German",
+            "it": "Italian",
+            "pt": "Portuguese",
+            "ru": "Russian",
+            "zh": "Chinese",
+            "ja": "Japanese",
+            "ko": "Korean",
+            "ar": "Arabic",
+            "hi": "Hindi",
+        }
+
+    @classmethod
+    def get_tts_languages(cls, model_id: str) -> Dict[str, str]:
+        """Get language options for a specific TTS model."""
+        model = cls.get_model(model_id)
+        if not model:
+            return {"en": "English"}
+
+        if hasattr(model, "language_options") and model.language_options:
+            return model.language_options
+
+        lang_names = {
+            "en": "English",
+            "zh": "Chinese",
+            "es": "Spanish",
+            "ja": "Japanese",
+            "ko": "Korean",
+            "fr": "French",
+            "de": "German",
+            "ar": "Arabic",
+            "pt": "Portuguese",
+            "ru": "Russian",
+            "hi": "Hindi",
+            "it": "Italian",
+        }
+        return {code: lang_names.get(code, code.upper()) for code in model.languages}
 
 
-# Global registry instance
+# =========================================================================
+# BACKWARD COMPATIBILITY - Keep existing API working
+# =========================================================================
+
+# Old-style lists for backward compatibility
+TTS_MODELS_LIST = [
+    {
+        "id": m.id,
+        "name": m.name,
+        "type": "tts",
+        "streaming": m.streaming,
+        "voice_cloning": m.voice_cloning_type is not None,
+        "languages": m.languages,
+    }
+    for m in ModelRegistry.TTS_MODELS.values()
+]
+
+ASR_MODELS_LIST = [
+    {"id": m.id, "name": m.name, "type": "asr"}
+    for m in ModelRegistry.ASR_MODELS.values()
+]
+
+
+# Global instance (for old code)
 model_registry = ModelRegistry()

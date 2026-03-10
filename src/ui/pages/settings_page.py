@@ -90,9 +90,9 @@ class SettingsPage(QWidget):
         model_layout = QHBoxLayout()
         model_layout.addWidget(BodyLabel("ASR Model:"))
         self.asr_model_combo = ComboBox()
-        from src.languages import CANARY_LANGUAGES
+        from src.model_registry import ModelRegistry
 
-        for lang_code, lang_name in CANARY_LANGUAGES.items():
+        for lang_code, lang_name in ModelRegistry.get_asr_languages().items():
             self.asr_model_combo.addItem(lang_name, userData=lang_code)
         current_asr = self.settings_manager.get("asr_model", "en")
         index = self.asr_model_combo.findData(current_asr)
@@ -147,6 +147,7 @@ class SettingsPage(QWidget):
         self.tts_model_combo = ComboBox()
         # Use dynamic model registry
         from src.model_registry import ModelRegistry
+
         registry = ModelRegistry()
         for model in registry.get_tts_models():
             self.tts_model_combo.addItem(model.name, userData=model.id)
@@ -165,6 +166,7 @@ class SettingsPage(QWidget):
         current_tts = self.settings_manager.get("tts_model", "chatterbox-fp16")
         # Use model registry for languages
         from src.model_registry import ModelRegistry
+
         registry = ModelRegistry()
         current_model = registry.get_model(current_tts)
         if current_model and current_model.language_options:
@@ -203,23 +205,28 @@ class SettingsPage(QWidget):
         # Voice Cloning Section (VibeVoice only)
         if current_tts == "vibevoice":
             voice_clone_header = BodyLabel("🎤 Voice Cloning (VibeVoice)")
-            voice_clone_header.setStyleSheet("font-weight: bold; color: #e6edf3; margin-top: 10px;")
+            voice_clone_header.setStyleSheet(
+                "font-weight: bold; color: #e6edf3; margin-top: 10px;"
+            )
             layout.addWidget(voice_clone_header)
-            
+
             clone_info = BodyLabel(
                 "VibeVoice supports voice cloning. Place .pt voice files in:\n"
                 "~/models/VibeVoiceRealtime05b/voices/"
             )
             clone_info.setStyleSheet("color: #8b949e; font-size: 11px;")
             layout.addWidget(clone_info)
-            
+
             # Voice selection for cloned voices
             voice_layout = QHBoxLayout()
             voice_layout.addWidget(BodyLabel("Voice:"))
             self.clone_voice_combo = ComboBox()
             # Populate with available voices
             import os
-            voice_dir = os.path.expanduser("~/new-projects/voice_ai/models/VibeVoiceRealtime05b/voices")
+
+            voice_dir = os.path.expanduser(
+                "~/new-projects/voice_ai/models/VibeVoiceRealtime05b/voices"
+            )
             if os.path.exists(voice_dir):
                 for f in os.listdir(voice_dir):
                     if f.endswith(".pt"):
@@ -382,12 +389,12 @@ class SettingsPage(QWidget):
 
     def _update_tts_language_combo(self, model_id):
         """Update TTS language combo based on selected model"""
-        from src.languages import TTS_MODELS
+        from src.model_registry import ModelRegistry
 
         self.tts_language_combo.blockSignals(True)
         self.tts_language_combo.clear()
 
-        tts_langs = TTS_MODELS.get(model_id, {}).get("languages", {"en": "English"})
+        tts_langs = ModelRegistry.get_tts_languages(model_id)
         for lang_code, lang_name in tts_langs.items():
             self.tts_language_combo.addItem(lang_name, userData=lang_code)
 

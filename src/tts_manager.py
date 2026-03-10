@@ -26,16 +26,14 @@ class TTSManager:
 
     def __init__(self, settings_manager):
         self.settings_manager = settings_manager
-        self.typing_mode = self.settings_manager.get("typing_mode", "wbind")
+        self.typing_mode = self.settings_manager.get("typing_mode", "grus")
 
-        # Available TTS models (removed chatterbox-turbo)
+        # Get TTS models from ModelRegistry as single source of truth
+        from src.model_registry import ModelRegistry
+
         self.available_tts_models = {
-            "neutts-nano": "NeuTTS-Nano",
-            "chatterbox-fp16": "Chatterbox FP16 (Multilingual)",
-            "sopranotts": "SopranoTTS",
-            "qwen-tts": "Qwen-TTS (0.6B CustomVoice)",
-            "kittentts": "KittenTTS (Ultra-lightweight, 80M params)",
-            "vibevoice": "VibeVoice Realtime (~300ms, streaming)",
+            model_id: model_info.display_name
+            for model_id, model_info in ModelRegistry.TTS_MODELS.items()
         }
 
         self.current_tts_model = self.settings_manager.get("tts_model", "neutts-nano")
@@ -271,7 +269,7 @@ class TTSManager:
         """Type text using gtt command"""
         try:
             process = subprocess.Popen(
-                ["wbind", "--type", text],
+                ["grus", "--type-text", text],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -279,11 +277,11 @@ class TTSManager:
             stdout, stderr = process.communicate()
 
             if process.returncode != 0:
-                print(f"wbind error: {stderr}")
+                print(f"grus error: {stderr}")
                 self._copy_to_clipboard(text)
 
         except FileNotFoundError:
-            print("wbind command not found. Please install gtt for dictation mode.")
+            print("grus command not found. Please install gtt for dictation mode.")
             self._copy_to_clipboard(text)
         except Exception as e:
             print(f"Text typing error: {e}")

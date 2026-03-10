@@ -37,6 +37,7 @@ AVAILABLE_TTS_MODELS = {
     "sopranotts": "SopranoTTS",
     "kittentts": "KittenTTS (Ultra-lightweight, 80M params)",
     "vibevoice": "VibeVoice Realtime (~300ms, streaming)",
+    "kanitts": "KaniTTS (English-only, high quality)",
 }
 
 
@@ -112,6 +113,17 @@ def load_tts_model(model_name: str):
             tts_model.load()
             current_model_name = model_name
             logger.info("VibeVoice model loaded successfully")
+            return True
+
+        elif model_name == "kanitts":
+            sys.path.insert(0, str(Path(__file__).parent.parent / "inference"))
+            from kanitts_inference import KaniTTSEngine
+
+            device = "cuda" if _check_cuda() else "cpu"
+            tts_model = KaniTTSEngine(device=device)
+            tts_model.load()
+            current_model_name = model_name
+            logger.info("KaniTTS model loaded successfully")
             return True
 
         else:
@@ -217,6 +229,23 @@ def generate_speech_tts(text: str, model_name: str, **kwargs):
         )
         return audio, tts_model.sample_rate
 
+    elif model_name == "kanitts":
+        voice_path = kwargs.get("voice_path", None)
+        language_tag = kwargs.get("language_tag", None)
+        temperature = kwargs.get("temperature", 0.8)
+        top_p = kwargs.get("top_p", 0.92)
+        repetition_penalty = kwargs.get("repetition_penalty", 1.15)
+
+        audio, _ = tts_model.synthesize(
+            text,
+            voice_path=voice_path,
+            language_tag=language_tag,
+            temperature=temperature,
+            top_p=top_p,
+            repetition_penalty=repetition_penalty,
+        )
+        return audio, tts_model._model.sample_rate
+
     else:
         raise ValueError(f"Unknown model: {model_name}")
 
@@ -267,6 +296,9 @@ class SynthesizeRequest(BaseModel):
     # VibeVoice params
     cfg_scale: float = 1.5
     do_sample: bool = False
+    # KaniTTS params
+    voice_path: str | None = None
+    language_tag: str | None = None
 
 
 class SynthesizeResponse(BaseModel):
@@ -379,6 +411,12 @@ async def synthesize(request: SynthesizeRequest):
                 "temperature": request.temperature,
                 "top_p": request.top_p,
                 "do_sample": request.do_sample,
+            }
+        elif request.model == "kanitts":
+            kwargs = {
+                "voice": request.voice,
+                "speed": request.speed,
+                "pitch": request.pitch,
             }
 
         # Generate speech

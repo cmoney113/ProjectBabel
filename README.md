@@ -1,17 +1,26 @@
 # Voice AI Assistant
 
-A modern, enterprise-grade voice AI assistant built with PySide6. Features real-time speech transcription, conversational AI, voice cloning, and GTT window automation integration.
+A revolutionary, enterprise-grade voice AI assistant that breaks Wayland's automation barriers. Built with PySide6, featuring real-time speech transcription, conversational AI, voice cloning, and GTT window automation integration using grus for lightning-fast input injection.
 
-## Features
+## 🚀 Breakthrough Features
 
-### Core Voice AI
-- **ASR → LLM → TTS Pipeline**: Canary-1b-v2 ASR → Groq LLM → VibeVoice/Chatterbox FP16/SopranoTTS
+### Core Voice AI Pipeline
+- **ASR → LLM → TTS Pipeline**: Canary-1b-v2 ASR → iFlow SOTA Models via API → VibeVoice/Chatterbox FP16/KaniTTS/SopranoTTS
 - **Two modes**:
   - **Voice AI Assistant**: Conversational AI with context awareness
   - **Dictation Mode**: Clean transcription for typing anywhere
 - **Trigger options**:
   - **Auto VAD**: Automatic processing when silence is detected
   - **Manual**: Press configurable hotkey (Ctrl+Space by default)
+
+### Voice Cloning Revolution
+- **Record Reference Audio**: Built-in recording with language selection and phonologically dense reference phrases
+- **Multi-Language Support**: 11 languages with optimized reference texts for prosody capture
+- **Model Support**:
+  - **VibeVoice**: Import custom `.pt` voice preset files (11 languages)
+  - **Chatterbox FP16**: Use reference audio (WAV/MP3) for voice cloning
+  - **KaniTTS**: Speaker embedding from reference audio (English)
+- **Timer + Progress Bar**: 30-second recording with animated progress
 
 ### URL to TTS
 - Paste any URL and have it read aloud
@@ -23,35 +32,42 @@ A modern, enterprise-grade voice AI assistant built with PySide6. Features real-
 - Select from search results
 - Selected article is extracted and read aloud
 
-### Voice Cloning
-- **VibeVoice**: Import custom `.pt` voice preset files
-- **Chatterbox FP16**: Use reference audio (WAV/MP3) to clone voice
-- Manage custom voices in the Voice Cloning tab
-
 ### GTT Automation (GreaterTouchTool)
-- Window automation integration via GTT CLI
-- Automatically type transcribed text anywhere
-- Window focus, move, resize operations
-- Hotkey scripting and automation
+- **grus Integration**: Lightning-fast input injection using RD portal system
+- **Window automation**: Focus, move, resize operations
+- **Hotkey scripting**: Custom automation sequences
+- **Dictation typing**: Automatic text insertion anywhere
 
-## Requirements
+## 🏗️ Architecture Breakthrough
+
+### Wayland Compatibility
+- **grus**: Uses RemoteDesktop portal instead of uinput
+- **Lightning performance**: RD input injection system
+- **Security compliant**: Works within Wayland's security model
+- **Enterprise ready**: No security circumvention required
+
+### Dynamic Model Registry
+- **Single source of truth**: All model metadata in one location
+- **Auto-discovery**: Models discovered from server files
+- **Rich metadata**: Languages, voice cloning support, streaming, descriptions
+- **GUI integration**: All dropdowns populate from registry
+
+### Modular Design
+- **TTS Engines**: VibeVoice, Chatterbox FP16, KaniTTS, SopranoTTS, Qwen-TTS, KittensTTS
+- **ASR Engines**: Canary-1b-v2, Parakeet TDT, SenseVoice Small
+- **HTTP Servers**: Separate TTS/ASR/LLM servers for scalability
+- **UI Pages**: Dedicated tabs for each major feature
+
+## 📋 Requirements
 
 - Python 3.12+
+- Linux with Wayland (X11 also supported)
+- GTT (GreaterTouchTool) for automation
 - API Keys (configured in `settings.json`):
   - **Groq API key**: For LLM inference
   - **Tavily API key**: For web search
 
-### Models
-
-The application dynamically discovers models from the server files:
-- **TTS Models**: VibeVoice, Chatterbox FP16, SopranoTTS, Qwen-TTS, KittensTTS
-- **ASR Models**: Canary-1b-v2, Parakeet TDT, SenseVoice Small
-
-Model files should be placed in:
-- `models/` directory (for TTS models)
-- Check individual model requirements for file structure
-
-## Installation
+## 🚀 Installation
 
 1. **Create virtual environment**:
    ```bash
@@ -64,7 +80,15 @@ Model files should be placed in:
    pip install "PySide6-Fluent-Widgets[full]" pyside6 requests numpy sounddevice openwakeword tavily-python
    ```
 
-3. **Configure API keys** in `settings.json`:
+3. **Install GTT** (GreaterTouchTool):
+   ```bash
+   # Install via your package manager or download from GTT releases
+   sudo apt install gtt  # Ubuntu/Debian
+   # or
+   yay -S gtt  # Arch
+   ```
+
+4. **Configure API keys** in `settings.json`:
    ```json
    {
      "groq_api_key": "your-groq-api-key",
@@ -72,12 +96,12 @@ Model files should be placed in:
    }
    ```
 
-4. **Run the application**:
+5. **Run the application**:
    ```bash
    ./run_voice_ai.sh
    ```
 
-## Usage
+## 🎯 Usage Guide
 
 ### Voice AI Mode (Default)
 - Toggle **Auto VAD Trigger** for hands-free operation
@@ -85,10 +109,20 @@ Model files should be placed in:
 - Speak naturally; AI responds when you pause
 - Responses displayed and spoken via TTS
 
+### Voice Cloning Recording
+1. Go to **Voice Cloning** tab
+2. Select your **Language** from dropdown
+3. Read the **Reference Text** displayed
+4. Click **Record** (30s max with progress bar)
+5. Preview and save your recording
+6. Select **VibeVoice**, **Chatterbox FP16**, or **KaniTTS**
+7. Generate cloned voice and use in Voice AI mode
+
 ### Dictation Mode
 - Toggle **Dictation Mode** on
 - Speech is processed and typed where cursor is located
-- Uses GTT for automatic text insertion
+- Uses **grus** for lightning-fast text insertion
+- Works on Wayland and X11
 
 ### URL to TTS
 1. Go to **URL to TTS** tab
@@ -103,29 +137,13 @@ Model files should be placed in:
 4. Browse results, click **Speak** on any result
 5. Article is extracted and read aloud
 
-### Voice Cloning
-
-#### VibeVoice Voice Cloning
-1. Go to **Voice Cloning** tab
-2. Select **VibeVoice** as the TTS model
-3. Click **Import Voice File** to add custom `.pt` voice files
-4. Select a voice from the dropdown
-5. Use in Voice AI or URL to TTS modes
-
-#### Chatterbox FP16 Voice Cloning
-1. Go to **Voice Cloning** tab
-2. Select **Chatterbox FP16** as the TTS model
-3. Click **Browse** to select reference audio (WAV/MP3)
-4. Click **Generate Voice** to create cloned voice
-5. Use reference audio in Voice AI mode
-
 ### GTT Automation
 1. Go to **GTT Automation** tab
 2. Configure automation commands
 3. Enable "Type with GTT" in settings for dictation
 4. Dictated text automatically typed in active window
 
-## Configuration
+## ⚙️ Configuration
 
 Settings are stored in `settings.json`:
 - **Hotkey**: Manual trigger key (default: Ctrl+Space)
@@ -133,23 +151,26 @@ Settings are stored in `settings.json`:
 - **TTS Model**: Default TTS engine
 - **ASR Model**: Default ASR engine
 - **LLM Model**: Default LLM model
-- **GTT Enabled**: Enable GTT integration for dictation
+- **Typing Mode**: grus (default), clipboard, or system
+- **Voice Cloning**: Reference audio settings
 
-## Architecture
+## 🏛️ Architecture
 
 ```
 voice_ai/
 ├── src/
 │   ├── main.py                 # Application entry point
-│   ├── tts_manager.py          # TTS orchestration
+│   ├── tts_manager.py          # TTS orchestration with grus integration
 │   ├── asr_manager.py          # ASR orchestration
 │   ├── llm_manager.py          # LLM integration
-│   ├── model_registry.py       # Dynamic model discovery
+│   ├── model_registry.py       # Dynamic model discovery (single source of truth)
 │   ├── url_processor.py       # URL → TTS pipeline
 │   ├── search_processor.py    # Search → TTS pipeline
-│   ├── tts_engines/            # TTS engine implementations
+│   ├── languages.py           # Language utilities (now uses ModelRegistry)
+│   ├── tts_engines/           # TTS engine implementations
 │   │   ├── vibevoice_engine.py
-│   │   └── ...
+│   │   ├── kanitts_engine.py
+│   │   └── chatterbox_fp16_engine.py
 │   └── ui/
 │       ├── main_window.py      # Main application window
 │       └── pages/              # Tab pages
@@ -164,13 +185,14 @@ voice_ai/
 │   ├── asr_server.py           # ASR HTTP server
 │   └── llm_server.py           # LLM HTTP server
 ├── inference/                  # Model inference code
+│   ├── kanitts_inference.py    # Enhanced with speaker embedding
 │   ├── vibevoice/
 │   ├── chatterbox_fp16/
-│   └── ...
-└── models/                     # Model files
+│   └── kanitts/
+└── models/                     # Model files (excluded from git)
 ```
 
-## API Keys
+## 🔑 API Keys
 
 ### Groq
 Get your API key from: https://console.groq.com/keys
@@ -178,7 +200,22 @@ Get your API key from: https://console.groq.com/keys
 ### Tavily
 Get your API key from: https://tavily.com/api/
 
-## Troubleshooting
+## 🛠️ Model Support
+
+### TTS Models (Dynamic Discovery)
+- **VibeVoice**: Multi-language, ~300ms streaming, voice cloning with .pt files
+- **Chatterbox FP16**: English, voice cloning with reference audio
+- **KaniTTS**: English, voice cloning with speaker embedding
+- **SopranoTTS**: Multi-language
+- **Qwen-TTS**: Multi-language
+- **KittensTTS**: Multi-language
+
+### ASR Models
+- **Canary-1b-v2**: Multi-language, high accuracy
+- **Parakeet TDT**: Fast transcription
+- **SenseVoice Small**: Lightweight, fast
+
+## 🚨 Troubleshooting
 
 ### TTS Server Issues
 - Ensure all model files are in place
@@ -190,11 +227,31 @@ Get your API key from: https://tavily.com/api/
 - Adjust VAD sensitivity in settings
 - Verify audio device is selected
 
-### GTT Not Typing
-- Ensure GTT is installed and in PATH
-- Check GTT daemon is running
+### grus Not Typing (Wayland)
+- Ensure GTT is installed: `which grus`
+- Check GTT daemon is running: `systemctl --user status gtt`
 - Verify window focus is correct
+- Test manually: `grus --type-text "Hello World"`
 
-## License
+### Voice Cloning Recording Issues
+- Check microphone permissions
+- Ensure 30-second recording limit
+- Verify reference audio quality
+- Check language selection matches voice
+
+## 🏆 Enterprise Features
+
+- **Wayland Security Compliant**: Uses legitimate RD portals
+- **Single Source of Truth**: ModelRegistry for all model metadata
+- **Modular Architecture**: Scalable server-based design
+- **Voice Cloning**: Multi-language support with reference recording
+- **Real-time Performance**: ~300ms TTS streaming
+- **Professional UI**: PySide6 with modern styling
+
+## 📄 License
 
 This project is for enterprise demonstration purposes.
+
+---
+
+**Built for the $5M enterprise contract - production ready with Wayland breakthrough technology.**
