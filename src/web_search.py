@@ -8,6 +8,23 @@ import re
 from typing import Optional, List
 
 
+# Alias for backward compatibility
+class TavilySearch:
+    """Simple wrapper for TavilyClient for easy instantiation"""
+    
+    def __init__(self, api_key: str):
+        self.client = TavilyClient(api_key=api_key)
+    
+    def search(self, query: str, max_results: int = 5):
+        """Perform search and return results"""
+        return self.client.search(
+            query=query,
+            search_depth="advanced",
+            include_answer=True,
+            max_results=max_results
+        )
+
+
 class WebSearchManager:
     """Manages web search functionality with Tavily API"""
     

@@ -5,7 +5,7 @@
 
 cd "$(dirname "$0")"
 export CUDA_VISIBLE_DEVICES=0
-. /home/craig/new-projects/voice_ai/venv/bin/activate
+source /home/craig/new-projects/voice_ai/voiceai-venv/bin/activate
 
 # Run ASR server in background
 echo "Starting ASR server on port 8710..."

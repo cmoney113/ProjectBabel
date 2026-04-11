@@ -17,6 +17,8 @@ from qfluentwidgets import (
     ToggleButton,
     InfoBar,
     SwitchButton,
+    TransparentToolButton,
+    FluentIcon,
 )
 
 
@@ -314,6 +316,45 @@ class SettingsPage(QWidget):
         api_layout.addStretch()
         layout.addLayout(api_layout)
 
+        # Base URL
+        url_layout = QHBoxLayout()
+        url_layout.addWidget(BodyLabel("Base URL:"))
+        self.groq_endpoint_edit = LineEdit()
+        self.groq_endpoint_edit.setText(self.settings_manager.get("groq_api_endpoint", "https://api.groq.com/openai/v1"))
+        self.groq_endpoint_edit.setPlaceholderText("https://api.groq.com/openai/v1")
+        self.groq_endpoint_edit.textChanged.connect(self._on_base_url_changed)
+        url_layout.addWidget(self.groq_endpoint_edit)
+        # Refresh models button
+        self.refresh_models_btn = TransparentToolButton(FluentIcon.SYNC, self)
+        self.refresh_models_btn.setToolTip("Refresh model list")
+        self.refresh_models_btn.clicked.connect(self._fetch_available_models)
+        url_layout.addWidget(self.refresh_models_btn)
+        url_layout.addStretch()
+        layout.addLayout(url_layout)
+
+        # Model ID (ComboBox with Custom option)
+        model_layout = QHBoxLayout()
+        model_layout.addWidget(BodyLabel("Model ID:"))
+        self.groq_model_combo = ComboBox()
+        self.groq_model_combo.addItem("Custom", "custom")
+        self.groq_model_combo.setCurrentIndex(0)
+        self.groq_model_combo.currentIndexChanged.connect(self._on_model_combo_changed)
+        model_layout.addWidget(self.groq_model_combo)
+        
+        # Custom model input (shown when "Custom" is selected)
+        self.groq_custom_model_edit = LineEdit()
+        self.groq_custom_model_edit.setText(self.settings_manager.get("groq_model", ""))
+        self.groq_custom_model_edit.setPlaceholderText("Enter custom model ID")
+        self.groq_custom_model_edit.setVisible(False)
+        model_layout.addWidget(self.groq_custom_model_edit)
+        model_layout.addStretch()
+        layout.addLayout(model_layout)
+        
+        # Store reference to current model for saving
+        self.current_groq_model = self.settings_manager.get("groq_model", "llama-3.3-70b-versatile")
+        
+        # Fetch models on load
+        self._fetch_available_models()
         # Tavily API Key
         tavily_layout = QHBoxLayout()
         tavily_layout.addWidget(BodyLabel("Tavily API Key:"))
@@ -325,6 +366,73 @@ class SettingsPage(QWidget):
         layout.addLayout(tavily_layout)
 
         return card
+
+
+    def _on_base_url_changed(self, text: str):
+        """Handle base URL change - refetch models"""
+        self._fetch_available_models()
+
+    def _on_model_combo_changed(self, index: int):
+        """Handle model combo box change - show/hide custom input"""
+        model_id = self.groq_model_combo.itemData(index)
+        if model_id == "custom":
+            self.groq_custom_model_edit.setVisible(True)
+        else:
+            self.groq_custom_model_edit.setVisible(False)
+            self.current_groq_model = model_id
+
+    def _fetch_available_models(self):
+        """Fetch available models from the API endpoint"""
+        import requests
+        
+        base_url = self.groq_endpoint_edit.text().strip()
+        api_key = self.groq_api_edit.text().strip()
+        
+        if not base_url or not api_key:
+            return
+        
+        try:
+            headers = {"Authorization": f"Bearer {api_key}"}
+            response = requests.get(
+                f"{base_url}/models",
+                headers=headers,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                models = data.get("data", [])
+                
+                # Store current selection
+                current_model = self.groq_model_combo.currentData() if self.groq_model_combo.currentData() != "custom" else self.groq_custom_model_edit.text()
+                
+                # Clear and rebuild combo (keep "Custom" option)
+                self.groq_model_combo.blockSignals(True)
+                self.groq_model_combo.clear()
+                self.groq_model_combo.addItem("Custom", "custom")
+                
+                for model in models:
+                    model_id = model.get("id", "")
+                    if model_id:
+                        self.groq_model_combo.addItem(model_id, model_id)
+                
+                # Try to restore previous selection
+                found = False
+                for i in range(self.groq_model_combo.count()):
+                    if self.groq_model_combo.itemData(i) == current_model:
+                        self.groq_model_combo.setCurrentIndex(i)
+                        found = True
+                        break
+                
+                if not found and current_model:
+                    # Add current model if not in list
+                    self.groq_model_combo.addItem(current_model, current_model)
+                    self.groq_model_combo.setCurrentIndex(self.groq_model_combo.count() - 1)
+                
+                self.groq_model_combo.blockSignals(False)
+                
+        except Exception as e:
+            print(f"Error fetching models: {e}")
 
     def browse_output_dir(self):
         """Browse for output directory"""
@@ -438,6 +546,13 @@ class SettingsPage(QWidget):
                 "silence_timeout_ms", self.vad_timeout_spin.value()
             )
             self.settings_manager.set("groq_api_key", self.groq_api_edit.text())
+            # Get model from combo box or custom input
+            if self.groq_model_combo.currentData() == "custom":
+                model_to_save = self.groq_custom_model_edit.text()
+            else:
+                model_to_save = self.groq_model_combo.currentData()
+            self.settings_manager.set("groq_model", model_to_save)
+            self.settings_manager.set("groq_api_endpoint", self.groq_endpoint_edit.text())
             self.settings_manager.set("tavily_api_key", self.tavily_api_edit.text())
 
             # Save to file

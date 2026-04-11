@@ -3,6 +3,7 @@ from src.model_registry import ModelRegistry
 
 # Convenience alias for backward compatibility
 CANARY_LANGUAGES = ModelRegistry.get_asr_languages()
+TTS_MODELS = ModelRegistry.TTS_MODELS
 
 
 def get_tts_languages(tts_model: str):

@@ -5,7 +5,13 @@ Contains: Start/Stop buttons, recording status, timer, waveform, sensitivity, Au
 
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout
 from PySide6.QtCore import Signal, Qt
-from qfluentwidgets import BodyLabel, PrimaryPushButton, PushButton, ToggleButton, ComboBox
+from qfluentwidgets import (
+    BodyLabel,
+    PrimaryPushButton,
+    PushButton,
+    ToggleButton,
+    ComboBox,
+)
 
 from src.circular_waveform import CircularWaveformWidget
 
@@ -19,8 +25,9 @@ class RecordingControlsWidget(QWidget):
     sensitivity_changed = Signal(str)
     auto_vad_toggled = Signal(bool)
 
-    def __init__(self, parent=None):
+    def __init__(self, tts_manager=None, parent=None):
         super().__init__(parent)
+        self.tts_manager = tts_manager
         self.setObjectName("RecordingControlsWidget")
         self._init_ui()
 
@@ -36,7 +43,9 @@ class RecordingControlsWidget(QWidget):
 
         # Section label
         button_label = BodyLabel("🎙️ Recording Controls")
-        button_label.setStyleSheet("font-weight: bold; font-size: 13px; color: #e6edf3;")
+        button_label.setStyleSheet(
+            "font-weight: bold; font-size: 13px; color: #e6edf3;"
+        )
         button_layout.addWidget(button_label)
 
         # Start button
@@ -101,7 +110,9 @@ class RecordingControlsWidget(QWidget):
         # Center: Waveform display
         self.waveform_widget = CircularWaveformWidget()
         self.waveform_widget.setFixedSize(120, 120)
-        main_layout.addWidget(self.waveform_widget, alignment=Qt.AlignmentFlag.AlignCenter)
+        main_layout.addWidget(
+            self.waveform_widget, alignment=Qt.AlignmentFlag.AlignCenter
+        )
 
         # Right: Sensitivity and Auto VAD
         controls_layout = QVBoxLayout()
@@ -122,6 +133,19 @@ class RecordingControlsWidget(QWidget):
         self.trigger_toggle.setChecked(False)
         self.trigger_toggle.toggled.connect(self._on_auto_vad_toggled)
         controls_layout.addWidget(self.trigger_toggle)
+
+        # Dictation toggle (in line with Auto VAD)
+        self.dictation_toggle = ToggleButton("Dictation")
+        self.dictation_toggle.setChecked(False)
+        self.dictation_toggle.toggled.connect(self._on_dictation_toggled)
+        controls_layout.addWidget(self.dictation_toggle)
+
+        # Inject Text dropdown (BELOW the dictation button)
+        self.inject_window_combo = ComboBox()
+        self.inject_window_combo.setFixedWidth(180)
+        self.inject_window_combo.setEnabled(False)
+        self.inject_window_combo.addItem("Inject Text...", userData=None)
+        controls_layout.addWidget(self.inject_window_combo)
 
         controls_layout.addStretch()
         main_layout.addLayout(controls_layout)
@@ -145,6 +169,28 @@ class RecordingControlsWidget(QWidget):
         """Emit Auto VAD toggle signal"""
         self.auto_vad_toggled.emit(checked)
 
+    def _on_dictation_toggled(self, checked: bool):
+        """Populate window list when dictation is toggled"""
+        if checked:
+            windows = self.tts_manager.get_window_list()
+            self.inject_window_combo.blockSignals(True)
+            self.inject_window_combo.clear()
+
+            if not windows:
+                self.inject_window_combo.addItem("No windows found", userData=None)
+            else:
+                self.inject_window_combo.addItem("Select window...", userData=None)
+                for w in windows:
+                    title = w.get("title", "Unknown")[:50]
+                    wm_class = w.get("wm_class", "")
+                    display_text = f"{title} ({wm_class})" if wm_class else title
+                    self.inject_window_combo.addItem(display_text, userData=w.get("id"))
+
+            self.inject_window_combo.blockSignals(False)
+            self.inject_window_combo.setEnabled(True)
+        else:
+            self.inject_window_combo.setEnabled(False)
+
     # Public API
     def set_listening_state(self, is_listening: bool):
         """Update UI for listening state"""
@@ -153,16 +199,22 @@ class RecordingControlsWidget(QWidget):
 
         if is_listening:
             self.recording_status_label.setText("Listening...")
-            self.recording_status_label.setStyleSheet("color: #4A90E2; font-size: 12px;")
+            self.recording_status_label.setStyleSheet(
+                "color: #4A90E2; font-size: 12px;"
+            )
         else:
             self.recording_status_label.setText("Ready")
-            self.recording_status_label.setStyleSheet("color: #666666; font-size: 12px;")
+            self.recording_status_label.setStyleSheet(
+                "color: #666666; font-size: 12px;"
+            )
 
     def set_processing_state(self, is_processing: bool):
         """Update UI for processing state"""
         if is_processing:
             self.recording_status_label.setText("Processing...")
-            self.recording_status_label.setStyleSheet("color: #FF6B6B; font-size: 12px;")
+            self.recording_status_label.setStyleSheet(
+                "color: #FF6B6B; font-size: 12px;"
+            )
             self.recording_timer_label.setText("Processing")
             self.listen_button.setEnabled(False)
             self.stop_button.setEnabled(False)

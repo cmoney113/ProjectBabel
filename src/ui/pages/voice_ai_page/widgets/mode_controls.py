@@ -27,24 +27,17 @@ class ModeControlsWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(15)
 
-        # Mode toggle
-        self.mode_toggle = ToggleButton("Dictation Mode", self)
+        # Mode toggle (no label, just the button)
+        self.mode_toggle = ToggleButton("Dictation", self)
         self.mode_toggle.setChecked(False)
         self.mode_toggle.toggled.connect(self._on_mode_toggled)
-        layout.addWidget(BodyLabel("Mode:"))
         layout.addWidget(self.mode_toggle)
 
-        # Window selector for dictation mode
-        window_label = BodyLabel("Window:")
-        window_label.setStyleSheet(
-            "font-size: 12px; color: #888888; margin-left: 20px;"
-        )
-        layout.addWidget(window_label)
-
+        # Window selector for dictation mode (moved under Dictation button)
         self.window_combo = ComboBox()
-        self.window_combo.setFixedWidth(200)
+        self.window_combo.setFixedWidth(150)
         self.window_combo.setEnabled(False)
-        self.window_combo.addItem("Select window...", userData=None)
+        self.window_combo.addItem("Inject Text...", userData=None)
         self.window_combo.currentIndexChanged.connect(self._on_window_changed)
         layout.addWidget(self.window_combo)
 

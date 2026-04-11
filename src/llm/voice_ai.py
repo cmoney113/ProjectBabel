@@ -66,8 +66,9 @@ class VoiceAIService:
 
     def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None):
         self.api_key = api_key
-        self.base_url = base_url or "https://apis.iflow.cn/v1"
-        self.model = "kimi-k2"  # Less restrictive content filters than qwen3-max
+        # Use Omniproxy gateway instead of direct iflow API
+        self.base_url = base_url or "http://127.0.0.1:8743/v1"
+        self.model = "qwen3-max"  # Available in Omniproxy
 
         # Fallback to direct API if iFlow not available
         self._use_direct_api = not HAS_IFLOW
@@ -126,21 +127,7 @@ class VoiceAIService:
     async def _call_direct_api(
         self, messages: List[Dict], temperature: float = 0.3
     ) -> Dict[str, Any]:
-        """Direct API call fallback"""
-        if not self.api_key:
-            # Try to load from ~/.iflow/settings.json
-            import json
-            from pathlib import Path
-
-            settings_path = Path.home() / ".iflow" / "settings.json"
-            if settings_path.exists():
-                with open(settings_path) as f:
-                    settings = json.load(f)
-                self.api_key = settings.get("apiKey")
-
-        if not self.api_key:
-            return {"success": False, "content": "", "error": "No iFlow API key"}
-
+        """Call Omniproxy gateway (no API key needed)"""
         payload = {
             "model": self.model,
             "messages": messages,
@@ -148,8 +135,8 @@ class VoiceAIService:
             "max_tokens": 500,
         }
 
+        # No API key needed for Omniproxy
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
 

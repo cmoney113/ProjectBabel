@@ -78,6 +78,9 @@ class VoiceAIPage(QWidget):
         self.voice_processor = main_window.get_voice_processor()
         self.tts_manager = main_window.get_tts_manager()
 
+        # Event tracking for ASR/TTS coordination
+        self.current_event_id = None
+
         # Initialize state manager
         self.state_manager = StateManager(self.settings_manager)
         self.state_manager.load_from_settings()
@@ -128,15 +131,26 @@ class VoiceAIPage(QWidget):
         header_layout = self._create_header_layout()
         content_layout.addLayout(header_layout)
 
-        # Recording controls and waveform
-        self.recording_controls = RecordingControlsWidget(self)
-        content_layout.addWidget(self.recording_controls)
+        # Horizontal container for recording controls + model selectors
+        controls_container = QWidget()
+        controls_h_layout = QHBoxLayout(controls_container)
+        controls_h_layout.setContentsMargins(0, 0, 0, 0)
+        controls_h_layout.setSpacing(20)
 
-        # Model selectors
+        # Recording controls and waveform (left side)
+        self.recording_controls = RecordingControlsWidget(self.tts_manager, self)
+        controls_h_layout.addWidget(self.recording_controls, 1)  # stretch factor 1
+
+        # Convenience property for dictation_toggle
+        self.dictation_toggle = self.recording_controls.dictation_toggle
+
+        # Model selectors (right side)
         self.model_selectors = ModelSelectorsWidget(
-            self.voice_processor, self.tts_manager, self
+            self.voice_processor, self.tts_manager, self.recording_controls, self
         )
-        content_layout.addWidget(self.model_selectors)
+        controls_h_layout.addWidget(self.model_selectors, 1)  # stretch factor 1
+
+        content_layout.addWidget(controls_container)
 
         # Progress indicator
         self.progress_ring = IndeterminateProgressRing()
@@ -150,12 +164,8 @@ class VoiceAIPage(QWidget):
         content_layout.addWidget(self.transcription_panel)
 
         # Response display
-        self.response_panel = ResponsePanelWidget(self.tts_manager, self)
+        self.response_panel = ResponsePanelWidget(self)
         content_layout.addWidget(self.response_panel)
-
-        # Mode controls
-        self.mode_controls = ModeControlsWidget(self.tts_manager, self)
-        content_layout.addWidget(self.mode_controls)
 
         content_layout.addStretch()
 
@@ -244,28 +254,20 @@ class VoiceAIPage(QWidget):
             self.ui_handlers.on_target_language_changed
         )
 
-        # Mode controls
-        self.mode_controls.mode_toggled.connect(
+        # Mode controls (now in ModelSelectorsWidget)
+        self.model_selectors.dictation_mode_changed.connect(
             self.ui_handlers.on_mode_toggled
         )
-        self.mode_controls.window_selected.connect(
+        self.model_selectors.window_selected.connect(
             self.ui_handlers.on_window_selected
         )
 
     def _connect_recording_signals(self):
         """Connect recording handler signals to UI updates"""
-        self.recording_handlers.recording_started.connect(
-            self._on_recording_started
-        )
-        self.recording_handlers.recording_stopped.connect(
-            self._on_recording_stopped
-        )
-        self.recording_handlers.processing_started.connect(
-            self.on_processing_started
-        )
-        self.recording_handlers.processing_finished.connect(
-            self.on_processing_finished
-        )
+        self.recording_handlers.recording_started.connect(self._on_recording_started)
+        self.recording_handlers.recording_stopped.connect(self._on_recording_stopped)
+        self.recording_handlers.processing_started.connect(self.on_processing_started)
+        self.recording_handlers.processing_finished.connect(self.on_processing_finished)
         self.recording_handlers.error_occurred.connect(self._on_error)
 
     # === Recording State Updates ===
@@ -304,9 +306,28 @@ class VoiceAIPage(QWidget):
         """Stop listening (called from hotkey)"""
         self.recording_handlers.stop_listening()
 
+
     def update_transcription(self, text: str):
         """Update transcription display and save to session"""
-        self.transcription_panel.append_transcription(text)
+        # Create new event in both panels if this is a new transcription
+        # This links the ASR (top) and TTS (bottom) boxes together
+        if self.current_event_id is None:
+            # Generate event ID from current timestamp
+            from datetime import datetime
+            self.current_event_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            # Create event in ASR panel (top box)
+            self.transcription_panel.create_event(self.current_event_id)
+            
+            # Create matching event in TTS panel (bottom box) with same timestamp
+            asr_event = self.transcription_panel.events.get(self.current_event_id)
+            if asr_event:
+                self.response_panel.create_event(self.current_event_id, asr_event.timestamp)
+            else:
+                self.response_panel.create_event(self.current_event_id)
+        
+        # Add transcription to ASR panel (top box)
+        self.transcription_panel.append_transcription(text, self.current_event_id)
 
         # Save to chat session
         if text.strip():
@@ -316,12 +337,28 @@ class VoiceAIPage(QWidget):
 
     def update_response(self, text: str):
         """Update response display with markdown"""
-        self.response_panel.append_response(text)
+        # Use the same event_id to link with the transcription
+        # This ensures the processed result appears in the same "conversation" as the raw input
+        event_id = self.current_event_id
+        
+        # If no event exists (shouldn't happen normally), create one
+        if event_id is None:
+            from datetime import datetime
+            event_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.current_event_id = event_id
+            self.transcription_panel.create_event(event_id)
+            asr_event = self.transcription_panel.events.get(event_id)
+            timestamp = asr_event.timestamp if asr_event else None
+            self.response_panel.create_event(event_id, timestamp)
+        
+        # Add response to TTS panel (bottom box) - uses same event_id
+        self.response_panel.append_response(text, event_id)
 
         # Save to chat session
         session = self.chat_session_manager.get_current_session()
         if session:
             session.add_message("assistant", text)
+
 
     def update_recording_timer(self):
         """Update the recording timer display"""
@@ -350,7 +387,7 @@ class VoiceAIPage(QWidget):
 
     def get_dictation_mode(self) -> bool:
         """Get current dictation mode state"""
-        return self.mode_controls.is_dictation_mode()
+        return self.model_selectors.is_dictation_mode()
 
     def get_verbosity(self) -> str:
         """Get current verbosity level"""
@@ -366,7 +403,7 @@ class VoiceAIPage(QWidget):
 
     def get_dictation_window_id(self) -> str | None:
         """Get selected window ID for dictation"""
-        return self.mode_controls.get_selected_window_id()
+        return self.model_selectors.get_selected_window_id()
 
     # === Private Methods ===
 
@@ -376,6 +413,9 @@ class VoiceAIPage(QWidget):
 
     def _on_session_selected(self, session_id: str):
         """Handle session selection from sidebar"""
+        # Reset event tracking for new session
+        self.current_event_id = None
+        
         self.chat_session_manager.switch_session(session_id)
         session = self.chat_session_manager.get_current_session()
 
@@ -403,6 +443,9 @@ class VoiceAIPage(QWidget):
 
     def _on_new_chat(self):
         """Handle new chat request"""
+        # Reset event tracking for new conversation
+        self.current_event_id = None
+        
         self.response_panel.clear_response()
         self.transcription_panel.clear_transcription()
         if hasattr(self.main_window, "voice_worker"):
@@ -449,9 +492,7 @@ class VoiceAIPage(QWidget):
             # Speak the content
             self._speak_text(content)
         else:
-            self.transcription_panel.append_transcription(
-                "⚠️ No content extracted"
-            )
+            self.transcription_panel.append_transcription("⚠️ No content extracted")
 
     def _run_web_search_and_show_results(self, query: str, max_results: int = 5):
         """Run web search and show results dialog"""
@@ -524,7 +565,7 @@ class VoiceAIPage(QWidget):
             url = result.get("url", "")
             content = result.get("content", "")[:100] + "..."
 
-            item_text = f"{i+1}. {title}\n   {url}\n   {content}"
+            item_text = f"{i + 1}. {title}\n   {url}\n   {content}"
             item = QListWidgetItem(item_text)
             item.setData(Qt.UserRole, result)
             list_widget.addItem(item)

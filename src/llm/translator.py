@@ -63,10 +63,17 @@ Translation:"""
 class TranslationService:
     """Groq-based translation service"""
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, settings_manager=None):
         self.api_key = api_key or os.environ.get("GROQ_API_KEY")
-        self.base_url = "https://api.groq.com/openai/v1/chat/completions"
-        self.model = "llama-3.3-70b-versatile"  # Fast, multilingual
+        
+        # Use settings if available, otherwise use defaults
+        if settings_manager:
+            groq_config = settings_manager.get_groq_config()
+            self.base_url = groq_config.get("endpoint", "https://api.groq.com/openai/v1/chat/completions")
+            self.model = groq_config.get("model", "llama-3.3-70b-versatile")
+        else:
+            self.base_url = "https://api.groq.com/openai/v1/chat/completions"
+            self.model = "llama-3.3-70b-versatile"  # Fast, multilingual
 
     async def translate(self, text: str, source_lang: str, target_lang: str) -> str:
         """Translate text from source to target language"""

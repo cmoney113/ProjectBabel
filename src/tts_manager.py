@@ -26,7 +26,7 @@ class TTSManager:
 
     def __init__(self, settings_manager):
         self.settings_manager = settings_manager
-        self.typing_mode = self.settings_manager.get("typing_mode", "grus")
+        self.typing_mode = self.settings_manager.get("typing_mode", "gtt")
 
         # Get TTS models from ModelRegistry as single source of truth
         from src.model_registry import ModelRegistry
@@ -266,10 +266,10 @@ class TTSManager:
             print(f"System TTS fallback error: {e}")
 
     def type_text(self, text: str):
-        """Type text using gtt command"""
+        """Type text using grus command"""
         try:
             process = subprocess.Popen(
-                ["grus", "--type-text", text],
+                ["gtt", "--type", text],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -281,7 +281,7 @@ class TTSManager:
                 self._copy_to_clipboard(text)
 
         except FileNotFoundError:
-            print("grus command not found. Please install gtt for dictation mode.")
+            print("grus command not found. Please install grus for dictation mode.")
             self._copy_to_clipboard(text)
         except Exception as e:
             print(f"Text typing error: {e}")
@@ -351,9 +351,7 @@ class TTSManager:
         if self.focus_window(window_id):
             # Small delay to let window focus complete
             import time
-
             time.sleep(0.1)
-            # Then type the text
             self.type_text(text)
         else:
             # Fallback: just try to type
@@ -363,7 +361,7 @@ class TTSManager:
         """Copy text to clipboard as fallback"""
         try:
             clipboard_commands = [
-                ["wl-copy"],
+                ["gtt", "--cb-set"],
                 ["xclip", "-selection", "clipboard"],
                 ["xsel", "--clipboard", "--input"],
                 ["pbcopy"],

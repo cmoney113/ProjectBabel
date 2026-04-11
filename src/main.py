@@ -45,16 +45,15 @@ def main():
         }
     """)
 
-    # Register cleanup handler for graceful shutdown
-    # This ensures HTTP sessions are properly closed
     def cleanup():
-        """Clean up resources on application exit"""
         print("Cleaning up resources...")
         try:
-            # Try to close HTTP client (will run in sync context)
             import asyncio
 
-            asyncio.get_event_loop().run_until_complete(close_http_client())
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(close_http_client())
+            loop.close()
         except Exception as e:
             print(f"Cleanup error: {e}")
 

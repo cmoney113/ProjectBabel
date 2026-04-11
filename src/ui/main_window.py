@@ -72,6 +72,7 @@ from src.ui.pages.voice_ai_page import VoiceAIPage
 from src.ui.pages.voice_cloning_page import VoiceCloningPage
 from src.ui.pages.gtt_page import GTTPage
 from src.ui.pages.settings_page import SettingsPage
+from src.ui.pages.projects_page import ProjectsPage
 from src.workers.voice_ai_worker import VoiceAIWorker
 from src.porcupine_manager import WakeWordManager
 
@@ -82,6 +83,7 @@ class MainWindow(FluentWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Canary Voice AI Assistant")
+        self.setMinimumSize(800, 600)
         self.resize(1200, 800)
 
         # Mini-mode state
@@ -166,6 +168,7 @@ class MainWindow(FluentWindow):
         self.voice_ai_page = VoiceAIPage(self)
         self.voice_cloning_page = VoiceCloningPage(self)
         self.gtt_page = GTTPage(self)
+        self.projects_page = ProjectsPage(self)
         self.settings_page = SettingsPage(self)
 
         # Add navigation items
@@ -174,6 +177,7 @@ class MainWindow(FluentWindow):
             self.voice_cloning_page, FluentIcon.MICROPHONE, "Voice Cloning"
         )
         self.addSubInterface(self.gtt_page, FluentIcon.ROBOT, "GTT Automation")
+        self.addSubInterface(self.projects_page, FluentIcon.FOLDER, "Projects")
         self.addSubInterface(self.settings_page, FluentIcon.SETTING, "Settings")
 
     def init_mini_mode_button(self):
@@ -308,7 +312,7 @@ class MainWindow(FluentWindow):
         # Set current TTS model
         current_tts = self.tts_manager.get_current_tts_model()
         self.voice_worker.set_tts_model(current_tts)
-        
+
         # Set KittenTTS voice if using KittenTTS
         if current_tts == "kittentts":
             kittentts_voice = self.voice_ai_page.get_kittentts_voice()
@@ -339,25 +343,21 @@ class MainWindow(FluentWindow):
 
     def enter_mini_mode(self):
         """Enter mini-mode: compact overlay window"""
-        from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout
         from PySide6.QtCore import Qt
         from src.ui.pages.mini_mode_page import MiniModePage
 
         self.is_mini_mode = True
         self.normal_geometry = self.geometry()
 
-        self.setWindowFlags(
-            Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint
-        )
-        self.resize(500, 350)
-        self.move(100, 50)
-
+        # Save and hide main window
         self.hide()
-        self.navigationInterface.hide()
 
+        # Create mini page and dialog
         self.mini_page = MiniModePage(self)
-        self.mini_dialog = self.mini_page.create_dialog(self)
-
+        self.mini_dialog = self.mini_page.create_dialog(None)
+        self.mini_dialog.setWindowTitle('Voice AI - Mini Mode')
+        
+        # Connect signals
         self.voice_worker.transcription_ready.connect(
             self.mini_page.on_transcription_ready
         )
@@ -369,10 +369,13 @@ class MainWindow(FluentWindow):
             self.mini_page.on_processing_finished
         )
 
+        # Update button icon
         if hasattr(self, "mini_mode_button"):
             self.mini_mode_button.setIcon(FluentIcon.UNPIN)
 
+        # Show and resize mini dialog
         self.mini_dialog.show()
+        self.mini_dialog.resize(450, 350)
 
     def exit_mini_mode(self):
         """Exit mini-mode: restore normal window"""
@@ -399,62 +402,4 @@ class MainWindow(FluentWindow):
         if hasattr(self, "mini_mode_button"):
             self.mini_mode_button.setIcon(FluentIcon.PIN)
 
-    def exit_mini_mode(self):
-        """Exit mini-mode: restore normal window"""
-        self.is_mini_mode = False
 
-        self.setWindowFlags(Qt.WindowType.Window)
-        if self.normal_geometry:
-            self.setGeometry(self.normal_geometry)
-
-        self.setStyleSheet("""
-            QMainWindow, FluentWindow {
-                background-color: #0a0f1d;
-            }
-        """)
-
-        if hasattr(self, "mini_widget"):
-            self.mini_widget.hide()
-            self.mini_widget.deleteLater()
-            self.mini_widget = None
-        self.mini_page = None
-
-        if hasattr(self, "voice_ai_page"):
-            self.voice_ai_page.show()
-        if hasattr(self, "voice_cloning_page"):
-            self.voice_cloning_page.show()
-        if hasattr(self, "settings_page"):
-            self.settings_page.show()
-
-        self.navigationInterface.show()
-
-        if hasattr(self, "mini_mode_button"):
-            self.mini_mode_button.setIcon(FluentIcon.PIN)
-
-        self.show()
-
-    def exit_mini_mode(self):
-        """Exit mini-mode: restore normal window"""
-        self.is_mini_mode = False
-
-        self.setWindowFlags(Qt.WindowType.Window)
-        if self.normal_geometry:
-            self.setGeometry(self.normal_geometry)
-
-        self.setStyleSheet("""
-            QMainWindow, FluentWindow {
-                background-color: #0a0f1d;
-            }
-        """)
-
-        self.stacked_widget.deleteLater()
-        self.stacked_widget = None
-        self.mini_page = None
-
-        self.setCentralWidget(None)
-        self.navigationInterface.show()
-
-        if hasattr(self, "mini_mode_button"):
-            self.mini_mode_button.setIcon(FluentIcon.PIN)
-
-        self.show()

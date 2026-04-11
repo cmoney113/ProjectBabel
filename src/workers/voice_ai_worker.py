@@ -107,6 +107,12 @@ class VoiceAIWorker(QThread):
                 f"Detected language: {detected_language} (confidence: {transcription_result.confidence})"
             )
 
+            # Check for empty transcription - skip processing if no speech detected
+            if not transcription or not transcription.strip():
+                self.logger.warning("No speech detected in audio, skipping processing")
+                self.processing_finished.emit()
+                return
+
             if self.is_dictation_mode:
                 # Dictation mode: translate if needed, then clean up
                 self._process_dictation(transcription, detected_language)

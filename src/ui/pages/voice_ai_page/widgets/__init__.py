@@ -2,8 +2,8 @@
 
 from .recording_controls import RecordingControlsWidget
 from .model_selectors import ModelSelectorsWidget
-from .transcription_panel import TranscriptionPanelWidget
-from .response_panel import ResponsePanelWidget
+from .enhanced_transcription_panel import EnhancedTranscriptionPanel as TranscriptionPanelWidget
+from .enhanced_response_panel import EnhancedResponsePanel as ResponsePanelWidget
 from .mode_controls import ModeControlsWidget
 
 __all__ = [

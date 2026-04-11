@@ -30,6 +30,7 @@ AVAILABLE_ASR_MODELS = {
     "canary-1b-v2": "Canary 1B v2",
     "parakeet-tdt-v3": "Parakeet TDT v3",
     "sensevoice-small": "SenseVoice Small",
+    "qwen3-asr": "Qwen3-0.6b (52 langs)",
 }
 
 
@@ -95,6 +96,19 @@ def load_asr_model(model_name: str):
             asr_model = SenseVoiceCTC(model_dir, provider="cuda")
             current_model_name = model_name
             logger.info("SenseVoice Small ASR model loaded successfully")
+            return True
+
+        elif model_name == "qwen3-asr":
+            model_dir = Path(__file__).parent.parent / "models" / "qwen-asr"
+            if not model_dir.exists():
+                raise ValueError(f"Qwen3-ASR model directory not found at {model_dir}")
+
+            # Import and load Qwen3-ASR model
+            from models.qwen_asr.qwen3_asr import Qwen3ASR
+
+            asr_model = Qwen3ASR(model_path=str(model_dir), device="cuda")
+            current_model_name = model_name
+            logger.info("Qwen3-ASR model loaded successfully")
             return True
 
         else:
@@ -199,6 +213,10 @@ async def transcribe(request: TranscribeRequest):
         if len(audio_array.shape) > 1:
             audio_array = audio_array.mean(axis=1)
 
+        # Log energy info
+        energy = np.sqrt(np.mean(audio_array**2))
+        logger.info(f"Received audio: {len(audio_array)} samples ({len(audio_array)/sr:.2f}s), RMS energy: {energy:.6f}")
+
         # Resample if needed
         if sr != 16000:
             import librosa
@@ -246,6 +264,52 @@ async def transcribe(request: TranscribeRequest):
             text = asr_model.transcribe(
                 audio_array, sample_rate=16000, language=sensevoice_lang, use_itn=True
             )
+        elif request.model == "qwen3-asr":
+            # Qwen3-ASR supports 30+ languages with auto-detection
+            # Language must be full name like "English", "Chinese", etc.
+            # NOT codes like "en", "zh"
+            QWEN3_LANG_MAP = {
+                "en": "English",
+                "zh": "Chinese",
+                "yue": "Cantonese",
+                "ar": "Arabic",
+                "de": "German",
+                "fr": "French",
+                "es": "Spanish",
+                "pt": "Portuguese",
+                "id": "Indonesian",
+                "it": "Italian",
+                "ko": "Korean",
+                "ru": "Russian",
+                "th": "Thai",
+                "vi": "Vietnamese",
+                "ja": "Japanese",
+                "tr": "Turkish",
+                "hi": "Hindi",
+                "ms": "Malay",
+                "nl": "Dutch",
+                "sv": "Swedish",
+                "da": "Danish",
+                "fi": "Finnish",
+                "pl": "Polish",
+                "cs": "Czech",
+                "fil": "Filipino",
+                "fa": "Persian",
+                "el": "Greek",
+                "hu": "Hungarian",
+                "mk": "Macedonian",
+                "ro": "Romanian",
+                "auto": None,  # Auto-detect
+            }
+            
+            # Map language code to full name, or pass None for auto-detection
+            qwen_lang = QWEN3_LANG_MAP.get(request.language.lower() if request.language else "auto", None)
+            detected_lang = request.language
+            
+            text = asr_model.transcribe(
+                audio_array, sample_rate=16000, language=qwen_lang
+            )
+
         else:
             text = ""
 

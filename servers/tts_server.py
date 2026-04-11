@@ -5,12 +5,22 @@ Port: 8711
 
 import sys
 import os
+
+# Fix for CUBLAS_STATUS_NOT_SUPPORTED with FP16 operations
+os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
+
 import base64
 import io
+import subprocess
+import json
 import numpy as np
 import torch
 from pathlib import Path
 from contextlib import asynccontextmanager
+
+# Enable TF32 for better FP16 compatibility
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
 
 # Add project paths first
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -38,6 +48,7 @@ AVAILABLE_TTS_MODELS = {
     "kittentts": "KittenTTS (Ultra-lightweight, 80M params)",
     "vibevoice": "VibeVoice Realtime (~300ms, streaming)",
     "kanitts": "KaniTTS (English-only, high quality)",
+    "pockettts": "PocketTTS (English-only, voice cloning)",
 }
 
 
@@ -116,14 +127,28 @@ def load_tts_model(model_name: str):
             return True
 
         elif model_name == "kanitts":
-            sys.path.insert(0, str(Path(__file__).parent.parent / "inference"))
-            from kanitts_inference import KaniTTSEngine
-
-            device = "cuda" if _check_cuda() else "cpu"
-            tts_model = KaniTTSEngine(device=device)
-            tts_model.load()
+            # Use subprocess wrapper for KaniTTS v2 (separate venv)
+            global kanitts_process
+            kanitts_process = KaniTTSSubprocess()
+            kanitts_process.start()
             current_model_name = model_name
-            logger.info("KaniTTS model loaded successfully")
+            logger.info("KaniTTS v2 (subprocess) loaded successfully")
+            return True
+
+        elif model_name == "pockettts":
+            from models.pocketTTS.pocket_tts_onnx import PocketTTSOnnx
+
+            model_dir = Path(__file__).parent.parent / "models" / "pocketTTS"
+            tts_model = PocketTTSOnnx(
+                models_dir=str(model_dir / "onnx"),
+                tokenizer_path=str(model_dir / "tokenizer.model"),
+                precision="int8",
+                device="auto",
+                temperature=0.7,
+                lsd_steps=10,
+            )
+            current_model_name = model_name
+            logger.info("PocketTTS model loaded successfully")
             return True
 
         else:
@@ -245,6 +270,32 @@ def generate_speech_tts(text: str, model_name: str, **kwargs):
             repetition_penalty=repetition_penalty,
         )
         return audio, tts_model._model.sample_rate
+
+    elif model_name == "pockettts":
+        # PocketTTS: English-only with voice cloning and streaming support
+        voice = kwargs.get("voice", "default")  # Audio file path for voice cloning
+        max_frames = kwargs.get("max_frames", 500)
+        streaming = kwargs.get("stream", False)  # Check for streaming request
+
+        if streaming:
+            # Use stream() method for streaming audio chunks
+            audio_chunks = []
+            for chunk in tts_model.stream(
+                text=text, voice=voice, max_frames=max_frames
+            ):
+                audio_chunks.append(chunk)
+            # Concatenate all chunks
+            import torch
+
+            audio = torch.cat(audio_chunks, dim=0)
+        else:
+            # Use generate() for non-streaming
+            audio = tts_model.generate(
+                text=text,
+                voice=voice,
+                max_frames=max_frames,
+            )
+        return audio, tts_model.SAMPLE_RATE
 
     else:
         raise ValueError(f"Unknown model: {model_name}")
@@ -416,14 +467,25 @@ async def synthesize(request: SynthesizeRequest):
             kwargs = {
                 "voice": request.voice,
                 "speed": request.speed,
-                "pitch": request.pitch,
+                "language_tag": request.language,
             }
 
         # Generate speech
         logger.info(
             f"Generating speech for model={request.model}, text='{request.text[:50]}...'"
         )
-        audio, sample_rate = generate_speech_tts(request.text, request.model, **kwargs)
+
+        # Special handling for kanitts - use subprocess
+        if request.model == "kanitts":
+            audio, sample_rate = kanitts_process.synthesize(
+                request.text,
+                temperature=request.temperature or 0.8,
+                language_tag=request.language,
+            )
+        else:
+            audio, sample_rate = generate_speech_tts(
+                request.text, request.model, **kwargs
+            )
         logger.info(f"Generated audio: {len(audio)} samples, sample_rate={sample_rate}")
 
         # Convert to base64

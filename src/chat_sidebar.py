@@ -54,15 +54,15 @@ class ChatSidebar(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)  # Align everything to top
 
         # Header with title, collapse button, and new chat button
         header_layout = QHBoxLayout()
 
         title_label = BodyLabel("Chats")
+        title_label.setObjectName("title_label")
         title_label.setStyleSheet("font-weight: bold; font-size: 14px;")
         header_layout.addWidget(title_label)
-
-        header_layout.addStretch()
 
         # Collapse button
         self.collapse_btn = TransparentToolButton(FluentIcon.MENU, self)
@@ -101,7 +101,7 @@ class ChatSidebar(QWidget):
             self.session_list.hide()
             self.setMinimumWidth(40)
         else:
-            self.collapse_btn.setIcon(FluentIcon.ARROW_LEFT)
+            self.collapse_btn.setIcon(FluentIcon.LEFT_ARROW)
             self.collapse_btn.setToolTip("Collapse Sidebar")
             self.setMaximumWidth(300)
             self.session_list.show()
@@ -216,18 +216,36 @@ class ChatSidebar(QWidget):
     def toggle_collapse(self):
         """Toggle sidebar collapse state"""
         self.is_collapsed = not self.is_collapsed
+        
+        # Find title label
+        title_label = self.findChild(BodyLabel, "title_label")
+        
         if self.is_collapsed:
             self.collapse_btn.setIcon(FluentIcon.MENU)
             self.collapse_btn.setToolTip("Expand Sidebar")
-            self.setMaximumWidth(40)
+            self.setMaximumWidth(60)
             self.session_list.hide()
-            self.setMinimumWidth(40)
+            self.setMinimumWidth(60)
+            
+            # Hide title when collapsed, show larger buttons
+            if title_label:
+                title_label.hide()
+            self.collapse_btn.setFixedSize(40, 40)
+            self.new_chat_btn.setFixedSize(40, 40)
+            self.collapse_btn.setVisible(True)
+            self.new_chat_btn.setVisible(True)
         else:
-            self.collapse_btn.setIcon(FluentIcon.ARROW_LEFT)
+            self.collapse_btn.setIcon(FluentIcon.LEFT_ARROW)
             self.collapse_btn.setToolTip("Collapse Sidebar")
             self.setMaximumWidth(300)
             self.session_list.show()
             self.setMinimumWidth(220)
+            
+            # Show title when expanded, reset button sizes
+            if title_label:
+                title_label.show()
+            self.collapse_btn.setFixedSize(32, 32)
+            self.new_chat_btn.setFixedSize(32, 32)
         
         # Emit signal for parent to handle layout
         self.sidebar_collapsed.emit(self.is_collapsed)

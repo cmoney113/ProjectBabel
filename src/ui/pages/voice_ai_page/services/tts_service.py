@@ -51,18 +51,17 @@ class TTSService:
                 language = self.settings_manager.get("vibevoice_language", "en")
 
         try:
-            # Use voice_worker to synthesize
-            if hasattr(self.main_window, "voice_worker"):
-                self.main_window.voice_worker.synthesize_and_play(
+            # Use tts_manager to synthesize
+            if self.tts_manager:
+                self.tts_manager.speak(
                     text,
                     model=model,
                     voice=voice,
                     language=language,
-                    streaming=streaming,
                 )
                 logger.info(f"TTS synthesis started for model: {model}")
             else:
-                logger.error("voice_worker not available on main_window")
+                logger.error("tts_manager not available")
         except Exception as e:
             logger.error(f"TTS synthesis failed: {e}")
             raise

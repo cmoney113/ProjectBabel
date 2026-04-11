@@ -32,7 +32,7 @@ class SettingsManager:
         """Create default settings"""
         default_settings = {
             "groq_api_key": "",
-            "groq_model": "openai/gpt-oss-120b",
+            "groq_model": "openai/gpt-oss-20b",
             "groq_api_endpoint": "https://api.groq.com/openai/v1/chat/completions",
             "post_process_prompt": "You are a DICTATION POST-PROCESSOR - NOT a conversational assistant...",
             "voice_ai_prompt": "You are a helpful assistant.",
@@ -43,9 +43,9 @@ class SettingsManager:
             "enable_llm": True,
             "paste_output": False,
             "min_words_for_llm": 7,
-            "typing_mode": "grus",
+            "typing_mode": "gtt",
             "target_language": "english",
-            "tts_streaming": False,
+            "tts_streaming": True,
             # Auto-save TTS outputs
             "tts_auto_save": True,
             "tts_output_dir": str(Path.home() / "Documents" / "babel" / "outputs"),
@@ -131,3 +131,40 @@ class SettingsManager:
     def get_post_process_prompt(self) -> str:
         """Get post-processing prompt template"""
         return self.get("post_process_prompt", "You are a DICTATION POST-PROCESSOR...")
+
+    # ==================== Prompt Management ====================
+
+    def get_prompts(self) -> Dict[str, str]:
+        """Get all saved prompts"""
+        return self.get(
+            "prompts",
+            {
+                "Default": "You are a helpful assistant.",
+                "Casual": "You are a casual, friendly assistant. Keep responses brief and conversational.",
+                "Professional": "You are a professional assistant. Be concise, accurate, and formal.",
+                "Coding": "You are a coding assistant. Provide clear, efficient code with explanations.",
+            },
+        )
+
+    def save_prompt(self, name: str, prompt: str) -> None:
+        """Save a prompt"""
+        prompts = self.get_prompts()
+        prompts[name] = prompt
+        self.set("prompts", prompts)
+
+    def delete_prompt(self, name: str) -> bool:
+        """Delete a prompt. Returns False if prompt doesn't exist or is default."""
+        prompts = self.get_prompts()
+        if name in prompts and name not in ["Default"]:
+            del prompts[name]
+            self.set("prompts", prompts)
+            return True
+        return False
+
+    def get_current_prompt(self) -> str:
+        """Get the currently selected prompt name"""
+        return self.get("current_prompt", "Default")
+
+    def set_current_prompt(self, name: str) -> None:
+        """Set the currently selected prompt"""
+        self.set("current_prompt", name)

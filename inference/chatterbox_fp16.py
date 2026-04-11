@@ -284,7 +284,7 @@ class ChatterboxFP16:
         eot = self.t3.hp.stop_text_token
         text_tokens = F.pad(text_tokens, (1, 0), value=sot)
         text_tokens = F.pad(text_tokens, (0, 1), value=eot)
-        
+
         with torch.inference_mode(), torch.autocast(self.device, dtype=torch.float16):
             speech_tokens = self.t3.inference(
                 t3_cond=t3_cond,
@@ -294,16 +294,16 @@ class ChatterboxFP16:
                 cfg_weight=cfg_weight,
                 repetition_penalty=repetition_penalty,
             )
-            
+
             speech_tokens = speech_tokens[0]
             speech_tokens = speech_tokens[speech_tokens < 6561]
             speech_tokens = speech_tokens.to(self.device)
-            
+
             wav, _ = self.s3gen.inference(
                 speech_tokens=speech_tokens,
                 ref_dict=gen_ref,
             )
-        
+
         return wav.squeeze(0).cpu().numpy()
     
     def get_vram_usage(self):

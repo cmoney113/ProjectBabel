@@ -1,7 +1,61 @@
-PySide6-Fluent-Widgets[full]
-pyside6
-requests
-numpy
-sounddevice
-openwakeword
-tavily-python
+# Core Framework & UI
+PySide6>=6.6.0
+PySide6-Fluent-Widgets[full] @ git+https://github.com/zhiyiYo/PyQt-Fluent-Widgets.git@PySide6
+requests>=2.31.0
+python-dotenv>=1.0.0
+loguru>=0.7.2
+pyperclip>=1.8.0
+
+# Audio Processing & IO
+numpy>=1.26.0
+scipy>=1.11.0
+sounddevice>=0.4.6
+pyaudio>=0.2.14
+soundfile>=0.12.1
+librosa>=0.10.1
+av>=12.0.0
+
+# ML & Model Inference Frameworks
+torch>=2.2.0
+torchaudio>=2.2.0
+accelerate>=0.27.0
+onnxruntime>=1.17.0
+transformers>=4.40.0
+diffusers>=0.26.0
+peft>=0.10.0
+datasets>=2.18.0
+
+# Specialized ASR/TTS Libraries
+onnx-asr>=0.1.0
+qwen-asr>=0.0.6
+sherpa-onnx>=1.10.0
+modelscope>=1.13.0
+pvporcupine>=3.0.0
+RealtimeTTS>=0.3.5
+soprano-tts>=0.1.0
+
+# API & Web Services
+tavily-python>=0.3.0
+openai>=1.12.0
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+aiortc>=1.8.0
+
+# Web Processing & Data Extraction
+archiveis>=0.0.9
+readability-lxml>=0.8.1
+beautifulsoup4>=4.11.0
+lxml>=4.9.0
+
+# Projects & Document Processing
+PyPDF2>=3.0.0
+python-docx>=0.8.11
+pytesseract>=0.3.10
+Pillow>=9.0.0
+
+# Utilities
+tqdm>=4.66.0
+ml-collections>=0.1.1
+absl-py>=2.1.0
+llvmlite>=0.42.0
+numba>=0.59.0
