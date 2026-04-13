@@ -109,6 +109,7 @@ class EnhancedTranscriptionPanel(QWidget):
     custom_text_toggled = Signal(bool)
     play_text_requested = Signal(str)
     transcription_updated = Signal(str)
+    tools_toggled = Signal(bool)  # AI tools enabled/disabled
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -189,6 +190,18 @@ class EnhancedTranscriptionPanel(QWidget):
             PushButton:disabled { background-color: #30363d; color: #8b949e; }
         """)
         custom_layout.addWidget(self.play_text_btn)
+        # Tools toggle - enables TermPipe tools for the AI
+        custom_layout.addSpacing(20)
+        custom_layout.addWidget(BodyLabel("🔧 AI Tools:"))
+
+        self.tools_toggle = SwitchButton()
+        self.tools_toggle.setChecked(True)  # Default ON
+        self.tools_toggle.setToolTip(
+            "Enable AI tools: file operations, web search, shell commands, etc. The AI can use these to help answer your requests."
+        )
+        self.tools_toggle.checkedChanged.connect(self._on_tools_toggled)
+        custom_layout.addWidget(self.tools_toggle)
+
         custom_layout.addStretch()
         card_layout.addLayout(custom_layout)
 
@@ -296,6 +309,24 @@ class EnhancedTranscriptionPanel(QWidget):
 
         self.play_text_requested.emit(text)
 
+    def _on_tools_toggled(self, checked: bool):
+        """Handle AI tools toggle"""
+        if checked:
+            InfoBar.success(
+                "AI Tools",
+                "Tools enabled: file ops, web search, shell commands",
+                parent=self,
+                duration=2000,
+            )
+        else:
+            InfoBar.info(
+                "AI Tools",
+                "Tools disabled - basic chat only",
+                parent=self,
+                duration=2000,
+            )
+        self.tools_toggled.emit(checked)
+
     # Public API
     def append_transcription(self, text: str, event_id: str = None):
         """
@@ -391,6 +422,14 @@ class EnhancedTranscriptionPanel(QWidget):
     def is_custom_text_enabled(self) -> bool:
         """Check if custom text mode is enabled"""
         return self.custom_text_toggle.isChecked()
+
+    def is_tools_enabled(self) -> bool:
+        """Check if AI tools are enabled"""
+        return self.tools_toggle.isChecked()
+
+    def set_tools_enabled(self, enabled: bool):
+        """Set AI tools enabled state"""
+        self.tools_toggle.setChecked(enabled)
 
     def enable_auto_scroll(self, enabled: bool = True):
         """Enable or disable auto-scroll"""

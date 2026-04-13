@@ -242,6 +242,9 @@ class VoiceAIPage(QWidget):
         self.transcription_panel.play_text_requested.connect(
             self._on_play_text_requested
         )
+        self.transcription_panel.tools_toggled.connect(
+            self.ui_handlers.on_tools_toggled
+        )
 
         # Response panel
         self.response_panel.verbosity_changed.connect(
@@ -400,6 +403,10 @@ class VoiceAIPage(QWidget):
     def get_target_language(self) -> str:
         """Get target language code"""
         return self.state_manager.state.target_language
+
+    def get_use_tools(self) -> bool:
+        """Get AI tools enabled state"""
+        return self.state_manager.state.use_tools
 
     def get_dictation_window_id(self) -> str | None:
         """Get selected window ID for dictation"""

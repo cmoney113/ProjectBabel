@@ -37,6 +37,9 @@ class VoiceAIState:
     # Custom text mode
     custom_text_enabled: bool = False
 
+    # AI tools
+    use_tools: bool = True  # Enable TermPipe tools for AI
+
 
 class StateManager(QObject):
     """Manages Voice AI state with signal notifications for changes"""
@@ -130,6 +133,7 @@ class StateManager(QObject):
             translation_enabled=self._settings_manager.get("translation_enabled", False),
             target_language=self._settings_manager.get("target_language", "en"),
             auto_vad_enabled=self._settings_manager.get("auto_vad_enabled", False),
+            use_tools=self._settings_manager.get("use_tools", True),
         )
 
     def save_to_settings(self):
@@ -147,3 +151,4 @@ class StateManager(QObject):
         self._settings_manager.set("translation_enabled", self._state.translation_enabled)
         self._settings_manager.set("target_language", self._state.target_language)
         self._settings_manager.set("auto_vad_enabled", self._state.auto_vad_enabled)
+        self._settings_manager.set("use_tools", self._state.use_tools)

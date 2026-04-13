@@ -38,7 +38,7 @@ class SettingsManager:
             "voice_ai_prompt": "You are a helpful assistant.",
             "silence_timeout_ms": 1000,
             "asr_model": "canary-1b-v2",
-            "tts_model": "neutts-nano",
+            "tts_model": "sopranotts",
             "enable_vad": True,
             "enable_llm": True,
             "paste_output": False,
@@ -65,7 +65,6 @@ class SettingsManager:
             },
             # TTS Model Settings
             "tts_settings": {
-                "neutts-nano": {"voice_id": "default", "speed": 1.0, "pitch": 1.0},
                 "chatterbox-fp16": {
                     "language": "en",
                     "exaggeration": 0.3,

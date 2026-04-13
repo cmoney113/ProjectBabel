@@ -175,14 +175,7 @@ def generate_speech_tts(text: str, model_name: str, **kwargs):
     """Generate speech using the current TTS model"""
     global tts_model
 
-    if model_name == "neutts-nano":
-        voice_id = kwargs.get("voice_id", "default")
-        speed = kwargs.get("speed", 1.0)
-        pitch = kwargs.get("pitch", 1.0)
-        audio = tts_model.generate(text, voice_id=voice_id, speed=speed, pitch=pitch)
-        return audio, 24000
-
-    elif model_name == "chatterbox-fp16":
+    if model_name == "chatterbox-fp16":
         language_id = kwargs.get("language_id", "en")
         exaggeration = kwargs.get("exaggeration", 0.3)
         cfg_weight = kwargs.get("cfg_weight", 0.1)
@@ -325,10 +318,6 @@ class SynthesizeRequest(BaseModel):
     # Voice cloning / reference audio
     reference_audio_base64: str | None = None
     reference_audio_format: str | None = None
-    # NeuTTS params
-    voice_id: str = "default"
-    speed: float = 1.0
-    pitch: float = 1.0
     # Chatterbox params
     language: str = "en"
     exaggeration: float = 0.3
@@ -413,13 +402,7 @@ async def synthesize(request: SynthesizeRequest):
 
         # Build kwargs based on model - convert 'language' to 'language_id' for chatterbox
         kwargs = {}
-        if request.model == "neutts-nano":
-            kwargs = {
-                "voice_id": request.voice_id,
-                "speed": request.speed,
-                "pitch": request.pitch,
-            }
-        elif request.model == "chatterbox-fp16":
+        if request.model == "chatterbox-fp16":
             kwargs = {
                 "language_id": request.language,  # Convert to language_id
                 "exaggeration": request.exaggeration,

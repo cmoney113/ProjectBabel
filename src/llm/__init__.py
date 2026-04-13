@@ -3,7 +3,7 @@ LLM Module - Unified LLM interfaces
 =====================================
 This module provides:
 - Translation service (Groq API)
-- Voice AI service (iFlow Qwen3-Max)
+- Voice AI service (OmniProxy SDK - Qwen3-Max, MiniMax-M2, etc.)
 
 Both can be used independently or through the pipeline orchestrator.
 """

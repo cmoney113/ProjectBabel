@@ -29,11 +29,11 @@ def test_components():
         
     # Test TTS module
     try:
-        from neutts.nano import NeuTTSNano
-        tts = NeuTTSNano('./models/neutts-nano')
-        print("✅ NeuTTS-Nano: OK")
+        from src.tts_engines.kittentts_engine import KittenTTSEngine
+        tts = KittenTTSEngine()
+        print("✅ KittenTTS Engine: OK")
     except Exception as e:
-        print(f"❌ NeuTTS-Nano: {e}")
+        print(f"❌ KittenTTS Engine: {e}")
         
     # Test main window import
     try:

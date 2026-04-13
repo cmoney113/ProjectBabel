@@ -118,3 +118,20 @@ class UIHandlers(QObject):
         """
         self.state_manager.update(custom_text_enabled=enabled)
         logger.info(f"Custom text mode {'enabled' if enabled else 'disabled'}")
+
+    def on_tools_toggled(self, enabled: bool):
+        """
+        Handle AI tools toggle
+
+        Args:
+            enabled: Whether AI tools are enabled
+        """
+        self.state_manager.update(use_tools=enabled)
+        self.settings_manager.set("use_tools", enabled)
+        
+        # Propagate to worker if available
+        if hasattr(self, 'parent') and self.parent and hasattr(self.parent, 'main_window'):
+            if hasattr(self.parent.main_window, 'voice_worker'):
+                self.parent.main_window.voice_worker.set_use_tools(enabled)
+        
+        logger.info(f"AI tools {'enabled' if enabled else 'disabled'}")

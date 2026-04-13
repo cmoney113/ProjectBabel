@@ -8,6 +8,9 @@ import logging
 from typing import Optional
 from PySide6.QtCore import QThread, Signal
 
+# Import ConversationContextManager as SSOT for conversation history
+from src.conversation_context import ConversationContextManager
+
 
 class VoiceAIWorker(QThread):
     """Background worker for voice processing with language detection and translation"""
@@ -33,10 +36,17 @@ class VoiceAIWorker(QThread):
         self.web_search_manager = web_search_manager
         self.settings_manager = settings_manager
 
+        # ConversationContextManager is the SSOT for conversation history
+        self.conversation_context = ConversationContextManager(
+            max_messages=50,
+            max_tokens=8000,
+            summary_threshold=20,
+            rolling_window_size=10,
+        )
+
         # Processing state
         self.current_audio = None
         self.is_dictation_mode = False
-        self.conversation_history = []
         self.translation_enabled = False
         self.dictation_window_id = None  # Window ID for dictation injection
 
@@ -49,6 +59,7 @@ class VoiceAIWorker(QThread):
         self.current_verbosity = "balanced"
         self.target_language = "en"
         self.current_tts_model = "chatterbox-fp16"
+        self.use_tools = True  # AI tools enabled by default
 
         # Logger
         self.logger = logging.getLogger(__name__)
@@ -68,6 +79,10 @@ class VoiceAIWorker(QThread):
     def set_target_language(self, lang: str):
         """Set target language for translation"""
         self.target_language = lang
+
+    def set_use_tools(self, enabled: bool):
+        """Enable/disable AI tools"""
+        self.use_tools = enabled
 
     def set_translation_enabled(self, enabled: bool):
         """Enable/disable translation"""
@@ -117,7 +132,7 @@ class VoiceAIWorker(QThread):
                 # Dictation mode: translate if needed, then clean up
                 self._process_dictation(transcription, detected_language)
             else:
-                # Voice AI mode: translate if needed, then process via iFlow
+                # Voice AI mode: translate if needed, then process via OmniProxy
                 self._process_voice_ai(transcription, detected_language)
 
             self.processing_finished.emit()
@@ -173,27 +188,30 @@ class VoiceAIWorker(QThread):
                         target_language=self.target_language,
                         tts_model=self.current_tts_model,
                         verbosity=self.current_verbosity,
+                        use_tools=self.use_tools,
                     )
                 )
                 response = result.output_text
             else:
-                # Fallback to old method
+                # Fallback to old method - use ConversationContextManager as SSOT
+                context_messages = self.conversation_context.get_context_for_llm()
                 should_search = self.web_search_manager.should_perform_search(
                     transcription, confidence_threshold=0.85
                 )
                 if should_search:
                     search_results = self.web_search_manager.search(transcription)
                     response = self.llm_manager.generate_response_with_context(
-                        transcription, self.conversation_history, search_results
+                        transcription, context_messages, search_results
                     )
                 else:
                     response = self.llm_manager.generate_response_with_context(
-                        transcription, self.conversation_history
+                        transcription, context_messages
                     )
 
             self.response_ready.emit(response)
-            self.conversation_history.append({"role": "user", "content": transcription})
-            self.conversation_history.append({"role": "assistant", "content": response})
+            # Add messages to ConversationContextManager (SSOT)
+            self.conversation_context.add_message("user", transcription)
+            self.conversation_context.add_message("assistant", response)
 
             # Speak response via TTS - pass voice and streaming settings
             streaming = self.settings_manager.get("tts_streaming", True)
@@ -224,3 +242,36 @@ class VoiceAIWorker(QThread):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
         return loop
+
+    # === Backward Compatibility Properties ===
+
+    @property
+    def conversation_history(self) -> list:
+        """Backward compatible property - returns context as list of dicts"""
+        return self.conversation_context.get_context_for_llm()
+
+    @conversation_history.setter
+    def conversation_history(self, messages: list):
+        """Backward compatible setter - clears and rebuilds context from list"""
+        self.conversation_context.clear_conversation()
+        for msg in messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if role and content:
+                self.conversation_context.add_message(role, content)
+
+    def clear_conversation(self):
+        """Clear conversation history"""
+        self.conversation_context.clear_conversation()
+
+    def get_conversation_stats(self) -> dict:
+        """Get conversation statistics"""
+        return self.conversation_context.get_conversation_stats()
+
+    def save_conversation(self, filepath: str):
+        """Save conversation to file"""
+        self.conversation_context.save_to_file(filepath)
+
+    def load_conversation(self, filepath: str):
+        """Load conversation from file"""
+        self.conversation_context.load_from_file(filepath)

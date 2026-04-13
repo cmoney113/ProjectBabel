@@ -4,8 +4,8 @@ Voice Pipeline Orchestrator
 Unified pipeline: ASR → Groq Post-Process → Translation → Voice AI/Dictation → TTS
 
 Flow:
-    [Audio] → [ASR] → [Groq Post-Process] → [Translate? via Groq] → [Voice AI via iFlow] → [TTS] → [Output]
-    [Audio] → [ASR] → [Groq Post-Process] → [Translate? via Groq] → [Dictation via iFlow] → [Wbind] → [Typed Output]
+    [Audio] → [ASR] → [Groq Post-Process] → [Translate? via Groq] → [Voice AI via OmniProxy] → [TTS] → [Output]
+    [Audio] → [ASR] → [Groq Post-Process] → [Translate? via Groq] → [Dictation via OmniProxy] → [Wbind] → [Typed Output]
 """
 
 import logging
@@ -56,6 +56,7 @@ class VoicePipeline:
         target_language: str,
         tts_model: str,
         verbosity: str = "balanced",
+        use_tools: bool = True,  # Enable TermPipe tools
     ) -> PipelineResult:
         """
         Full Voice AI pipeline:
@@ -80,13 +81,14 @@ class VoicePipeline:
             else:
                 translated = cleaned_text
 
-            # Step 3: Voice AI processing via iFlow
+            # Step 3: Voice AI processing via OmniProxy
             processed = await process_voice_prompt(
                 user_input=translated,
                 conversation_history=self.conversation_history,
                 target_language=target_language,
                 mode="voice_ai",
                 verbosity=verbosity,
+                use_tools=use_tools,
             )
 
             # Update conversation history
@@ -145,7 +147,7 @@ class VoicePipeline:
             else:
                 translated = cleaned_text
 
-            # Step 3: iFlow dictation processing (additional cleanup/formatting)
+            # Step 3: OmniProxy dictation processing (additional cleanup/formatting)
             processed = await process_voice_prompt(
                 user_input=translated,
                 conversation_history=[],  # No history for dictation

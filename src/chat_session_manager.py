@@ -133,35 +133,41 @@ class ChatSessionManager:
             json.dump(data, f, indent=2)
 
     def _generate_session_name(self, first_message: str = None) -> str:
-        """Generate intelligent session name using iFlow API based on conversation content"""
+        """Generate intelligent session name using OmniProxy API based on conversation content"""
         if not first_message:
             return f"Chat {datetime.now().strftime('%b %d, %Y %H:%M')}"
 
         try:
-            # Use iFlow API for intelligent naming
+            # Use OmniProxy API for intelligent naming
             # Prepare conversation context
             context = first_message.strip()
             if not context:
                 return f"Chat {datetime.now().strftime('%b %d, %Y %H:%M')}"
 
-            # Call iFlow API to generate session name
+            # Call OmniProxy API to generate session name
             prompt = f"Based on this conversation: '{context[:500]}'\nGenerate a concise, intelligent chat session name (3-5 words) that captures the main topic."
 
-            # Use iFlow provider directly
-            from persistent_context_and_memory import iFlow
+            # Use OmniProxy SDK
+            import sys
+            import os
+            sys.path.insert(0, str(os.path.expanduser("~/omniproxy/sdk/python")))
+            from omniproxy import Client
 
-            response = iFlow.chat(
-                prompt=prompt,
-                system_prompt="You are an AI assistant that generates concise, intelligent chat session names. Analyze the user's message and create a title that captures the main topic in 3-5 words. Be specific but brief.",
+            client = Client(base_url="http://127.0.0.1:8743")
+            suggested_name = client.chat(
+                model="qwen3-max",
+                message=prompt,
+                system="You are an AI assistant that generates concise, intelligent chat session names. Analyze the user's message and create a title that captures the main topic in 3-5 words. Be specific but brief.",
             )
 
-            suggested_name = response.get("content", "").strip()
+            suggested_name = suggested_name.strip()
 
             if suggested_name and len(suggested_name) >= 3:
                 return suggested_name[:50]  # Limit length
 
         except Exception as e:
             print(f"Failed to generate intelligent session name: {e}")
+
 
         # Fallback to original truncation method
         return self._fallback_session_name(first_message)

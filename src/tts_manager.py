@@ -36,7 +36,7 @@ class TTSManager:
             for model_id, model_info in ModelRegistry.TTS_MODELS.items()
         }
 
-        self.current_tts_model = self.settings_manager.get("tts_model", "neutts-nano")
+        self.current_tts_model = self.settings_manager.get("tts_model", "sopranotts")
         self.current_tts_voice = self.settings_manager.get(
             "tts_voice", "Jasper"
         )  # KittenTTS voice
@@ -103,11 +103,7 @@ class TTSManager:
             payload = {"text": text, "model": self.current_tts_model}
 
             # Add model-specific parameters
-            if self.current_tts_model == "neutts-nano":
-                payload["voice_id"] = kwargs.get("voice_id", "default")
-                payload["speed"] = kwargs.get("speed", 1.0)
-                payload["pitch"] = kwargs.get("pitch", 1.0)
-            elif self.current_tts_model == "chatterbox-fp16":
+            if self.current_tts_model == "chatterbox-fp16":
                 payload["language"] = kwargs.get("language", "en")
                 payload["exaggeration"] = kwargs.get("exaggeration", 0.3)
                 payload["cfg_weight"] = kwargs.get("cfg_weight", 0.1)
@@ -497,11 +493,7 @@ class TTSManager:
                 except Exception as e:
                     print(f"Error reading reference audio: {e}")
 
-            if self.current_tts_model == "neutts-nano":
-                payload["voice_id"] = kwargs.get("voice_id", "default")
-                payload["speed"] = kwargs.get("speed", 1.0)
-                payload["pitch"] = kwargs.get("pitch", 1.0)
-            elif self.current_tts_model == "chatterbox-fp16":
+            if self.current_tts_model == "chatterbox-fp16":
                 payload["language"] = kwargs.get("language", "en")
                 payload["exaggeration"] = kwargs.get("exaggeration", 0.3)
                 payload["cfg_weight"] = kwargs.get("cfg_weight", 0.1)

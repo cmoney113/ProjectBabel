@@ -4,7 +4,7 @@ Canary Voice AI Assistant - Main Application Entry Point
 Modern PySide6/Fluent UI Application with Modular Architecture
 
 Features:
-- Canary-1b-v2 ASR -> Groq openai/gpt-oss-120b -> NeuTTS-Nano pipeline
+- Canary-1b-v2 ASR -> Groq openai/gpt-oss-120b -> SopranoTTS pipeline
 - Two modes: Voice AI Assistant and Dictation Mode
 - Toggle between VAD auto-trigger and manual key press
 - Dark navy theme with Fluent UI animations and transitions
